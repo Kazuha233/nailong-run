@@ -20,14 +20,6 @@
   #btnJump { left:22px; }   /* 跳 → 左下 */
   #btnDuck  { right:22px; } /* 蹲 → 右下 */
   @media (pointer:coarse) { .btn { display:flex; } }
-  /* 竖屏视口（含微信内置浏览器默认竖屏渲染）：游戏窗口旋转 90° 横板显示 */
-  body.portrait #stage {
-    width:100vh; height:100vw; top:50%; left:50%;
-    transform:translate(-50%,-50%) rotate(90deg);
-  }
-  /* 旋转后按钮：盒左上=视觉左下（跳），盒左下=视觉右下（蹲） */
-  body.portrait #btnJump { top:22px; left:22px; right:auto; bottom:auto; }
-  body.portrait #btnDuck  { bottom:22px; left:22px; right:auto; top:auto; }
   #btnRestart {
     position:absolute; left:50%; top:84%; transform:translate(-50%,-50%);
     display:none; padding:10px 32px; font-size:18px; font-weight:bold;
@@ -200,32 +192,17 @@ btnRestart.addEventListener('pointerdown', e => {
   btnRestart.style.display = 'none';
 });
 
-// ---------- 画布自适应（竖屏视口 → 游戏窗口旋转 90° 横板显示） ----------
+// ---------- 画布自适应 ----------
 function resize(){
   const dpr = window.devicePixelRatio || 1;
   canvas.width = VW*dpr; canvas.height = VH*dpr;
-  // 微信内置浏览器默认竖屏渲染（手机横放视口仍竖）→ 检测视口方向旋转内容
-  const portrait = window.innerHeight > window.innerWidth;
-  document.body.classList.toggle('portrait', portrait);
-  // 竖屏时容器旋转 90°，可用宽=视口高、可用高=视口宽
-  const availW = portrait ? innerHeight : innerWidth;
-  const availH = portrait ? innerWidth  : innerHeight;
-  const r = Math.min(availW/VW, availH/VH);
+  const r = Math.min(innerWidth/VW, innerHeight/VH);
   canvas.style.width  = (VW*r|0)+'px';
   canvas.style.height = (VH*r|0)+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 window.addEventListener('resize', resize);
 resize();
-// 手机浏览器增强：尝试锁定横屏（微信 WebView 内无效但静默失败；其余浏览器竖屏也会自动转横）
-function tryLockLandscape(){
-  try {
-    if (screen.orientation && screen.orientation.lock){
-      screen.orientation.lock('landscape').catch(function(){});
-    }
-  } catch(e){}
-}
-window.addEventListener('pointerdown', function(){ tryLockLandscape(); }, { once:true });
 
 // ---------- 重置 ----------
 function reset(){
