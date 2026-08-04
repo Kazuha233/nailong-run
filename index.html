@@ -85,7 +85,7 @@ let winStart = 0;        // 通关时刻（字幕动画计时）
 const fog = { active:false, opacity:0, timer:0, duration:0, nextIn:20, hint:0 };
 
 // ---------- 本地高分 ----------
-try { best = +localStorage.getItem('nailongRunBest') || 0; } catch(e) {}
+try { best = +localStorage.getItem('nailongRunBestV2') || 0; } catch(e) {}
 
 // ---------- 音效（WebAudio 程序合成） ----------
 let actx = null;
@@ -467,7 +467,7 @@ function gameOver(){
   btnRestart.style.display = 'block';          // 必须点击按钮才能再来一局
   if (Math.floor(score) > best){
     best = Math.floor(score);
-    try { localStorage.setItem('nailongRunBest', best); } catch(e){}
+    try { localStorage.setItem('nailongRunBestV2', best); } catch(e){}
   }
 }
 
@@ -480,7 +480,7 @@ function winGame(){
   btnRestart.style.display = 'block';
   if (Math.floor(score) > best){
     best = Math.floor(score);
-    try { localStorage.setItem('nailongRunBest', best); } catch(e){}
+    try { localStorage.setItem('nailongRunBestV2', best); } catch(e){}
   }
   // 胜利三连音
   beep(523, 784, .18, 'sine', .15);
