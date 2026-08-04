@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>奶龙快跑 🦖</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦖</text></svg>">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#101018; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  body { display:flex; align-items:center; justify-content:center; }
+  #game { image-rendering:pixelated; }
+  .btn {
+    position:fixed; bottom:28px; width:66px; height:66px; border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; font-size:24px; font-weight:bold;
+    border:2px solid rgba(255,255,255,.32); display:none; align-items:center; justify-content:center;
+    z-index:10; user-select:none; -webkit-user-select:none; font-family:"Microsoft YaHei",sans-serif;
+  }
+  .btn:active { background:rgba(255,255,255,.38); }
+  #btnJump { right:22px; }
+  #btnDuck  { left:22px; }
+  @media (pointer:coarse) { .btn { display:flex; } }
+  #stage { position:relative; display:inline-block; line-height:0; }
+  #btnRestart {
+    position:absolute; left:50%; top:84%; transform:translate(-50%,-50%);
+    display:none; padding:10px 32px; font-size:18px; font-weight:bold;
+    background:#FFB020; color:#5B3A00; border:none; border-radius:12px;
+    cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
+    box-shadow:0 4px 0 #E08F00; z-index:20;
+  }
+  #btnRestart:active { transform:translate(-50%,-50%) translateY(3px); box-shadow:0 1px 0 #E08F00; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+  <button id="btnRestart">🦖 再来一局</button>
+</div>
+<div class="btn" id="btnJump">跳</div>
+<div class="btn" id="btnDuck">蹲</div>
+<script>
+'use strict';
+/* =========================================================
+ *  奶龙快跑 Nailong Run  —  致敬 Chrome 小恐龙
+ *  纯 Canvas 程序绘制：像素奶龙 / 障碍 / 奶鱼，零外部素材
+ * ========================================================= */
+
+// ---------- 基础常量 ----------
+const VW = 800, VH = 300;          // 逻辑分辨率
+const GROUND_Y = 260;              // 地面 Y
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ---------- 游戏状态 ----------
+let state = 'ready';               // ready | playing | gameover
+let score = 0, fishCount = 0, best = 0;    // 显示分=进度×9999（匀速），初始 0 条奶鱼
+let distScore = 0;                          // 内部距离分（只驱动速度，不显示）
+let speed = 6, groundOffset = 0, night = false;
+let nightMix = 0;                      // 昼夜过渡值（0=白天，1=夜晚，平滑渐变）
+let stormMix = 0;                      // 雷暴强度（BGM 过半后事件式来临）
+let stormFlash = 0;                    // 闪电白闪强度
+let stormTimer = 6;                    // 下次闪电倒计时（秒）
+let stormActive = false;               // 雷暴进行中
+let stormNext = 12;                    // 下次雷暴倒计时（秒）
+let stormDur = 0;                      // 本次雷暴剩余时间（秒）
+let spawnDist = 500;
+
+// ---------- 奶龙 ----------
+const dino = {
+  x: 84, y: GROUND_Y, vy: 0,
+  mode: 'run',          // run | jump | duck
+  onGround: true, animT: 0
+};
+
+let obstacles = [], fishes = [];
+
+// 破碎碎片 + 保命无敌 + 护体提示
+let shards = [];
+let invincible = 0;
+let shieldHint = 0;
+let zoom = 1;            // 镜头缩放（临近终点时逐渐拉远）
+let winStart = 0;        // 通关时刻（字幕动画计时）
+
+// 夜晚特殊事件：雾天（任何天气都可能触发，阻碍视线）
+const fog = { active:false, opacity:0, timer:0, duration:0, nextIn:20, hint:0 };
+
+// ---------- 本地高分 ----------
+try { best = +localStorage.getItem('nailongRunBest') || 0; } catch(e) {}
+
+// ---------- 音效（WebAudio 程序合成） ----------
+let actx = null;
+function initAudio(){
+  if (!actx) { try { actx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} }
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function beep(f0, f1, dur, type, vol){
+  if (!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(f0, actx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(f1,1), actx.currentTime + dur);
+  g.gain.setValueAtTime(vol||0.15, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(); o.stop(actx.currentTime + dur);
+}
+const sfx = {
+  jump : () => beep(320, 700, .16, 'triangle', .16),
+  fish : () => beep(880, 1400, .12, 'sine', .14),
+  start: () => beep(440, 900, .14, 'sine', .12),
+  hit  : () => beep(170, 38, .35, 'sawtooth', .22)
+};
+// 障碍破碎音效（白噪声短爆）
+function sfxBreak(){
+  if (!actx) return;
+  const dur = 0.25;
+  const buf = actx.createBuffer(1, Math.floor(actx.sampleRate*dur), actx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * (1 - i/d.length);
+  const s = actx.createBufferSource();
+  s.buffer = buf;
+  const g = actx.createGain(); g.gain.value = 0.35;
+  s.connect(g); g.connect(actx.destination);
+  s.start();
+}
+// 雷声（低频噪声，闪电后延迟响起）
+function sfxThunder(){
+  if (!actx) return;
+  const dur = 0.9;
+  const buf = actx.createBuffer(1, Math.floor(actx.sampleRate*dur), actx.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i=0;i<d.length;i++){
+    last = last*0.9 + (Math.random()*2-1)*0.4;
+    d[i] = last * (1 - i/d.length) * 0.8;
+  }
+  const s = actx.createBufferSource();
+  s.buffer = buf;
+  const f = actx.createBiquadFilter();
+  f.type = 'lowpass'; f.frequency.value = 300;
+  const g = actx.createGain(); g.gain.value = 0.5;
+  s.connect(f); f.connect(g); g.connect(actx.destination);
+  s.start();
+}
+
+// ---------- 调色板（日夜） ----------
+const PAL = {
+  day:   { sky:'#FFF3C4', sky2:'#FFE29A', hill:'#D9E8A8', ground:'#8FD460', line:'#6FBF45', cloud:'rgba(255,255,255,.9)' },
+  night: { sky:'#141E38', sky2:'#1E2C50', hill:'#22304F', ground:'#2F4A3B', line:'#243B2E', cloud:'rgba(255,255,255,.1)' }
+};
+const stars = [];
+for (let i=0;i<40;i++) stars.push({ x:Math.random()*VW, y:Math.random()*150, r:Math.random()*1.4+0.4, tw:Math.random()*6.28 });
+const clouds = [ {x:150,y:60,s:.8}, {x:430,y:95,s:1.15}, {x:660,y:48,s:.65} ];
+
+// ---------- 输入 ----------
+function pressJump(){
+  initAudio();
+  if (state === 'ready')   { state='playing'; sfx.start(); bgm.currentTime=0; bgm.play().catch(function(){}); return; }
+  if (dino.mode === 'duck'){ dino.mode='run'; }    // 蹲着按跳：先站起再跳
+  if (dino.onGround){ dino.vy = -10; dino.mode='jump'; dino.onGround=false; sfx.jump(); }
+}
+function pressDuck(){
+  initAudio();
+  if (state !== 'playing') return;
+  if (dino.onGround) dino.mode = 'duck';       // 按住 = 蹲下
+}
+function releaseDuck(){
+  if (dino.mode === 'duck') dino.mode = 'run'; // 松手 = 站起
+}
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW'){ e.preventDefault(); pressJump(); }
+  else if (e.code==='ArrowDown'||e.code==='KeyS'){ e.preventDefault(); pressDuck(); }
+});
+window.addEventListener('keyup', e => {
+  if (e.code==='ArrowDown'||e.code==='KeyS') releaseDuck();
+});
+canvas.addEventListener('pointerdown', e => { e.preventDefault(); pressJump(); });
+const btnJump = document.getElementById('btnJump'), btnDuck = document.getElementById('btnDuck');
+btnJump.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pressJump(); });
+btnDuck .addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pressDuck(); });
+btnDuck .addEventListener('pointerup',     e => { e.stopPropagation(); releaseDuck(); });
+btnDuck .addEventListener('pointercancel', e => { e.stopPropagation(); releaseDuck(); });
+btnDuck .addEventListener('pointerleave',  e => { e.stopPropagation(); releaseDuck(); });
+
+// 「再来一局」按钮：结算后必须点击才重开（空格不触发）
+const btnRestart = document.getElementById('btnRestart');
+btnRestart.addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  initAudio();
+  reset(); state='playing'; sfx.start();
+  bgm.currentTime = 0; bgm.play().catch(function(){});
+  btnRestart.style.display = 'none';
+});
+
+// ---------- 画布自适应 ----------
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = VW*dpr; canvas.height = VH*dpr;
+  const r = Math.min(innerWidth/VW, innerHeight/VH);
+  canvas.style.width  = (VW*r|0)+'px';
+  canvas.style.height = (VH*r|0)+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ---------- 重置 ----------
+function reset(){
+  obstacles = []; fishes = []; shards = [];
+  score = 0; fishCount = 0; distScore = 0; speed = 6; spawnDist = 500; night = false; nightMix = 0;   // 初始 0 条奶鱼
+  dino.y = GROUND_Y; dino.vy = 0; dino.mode='run'; dino.onGround=true;
+  invincible = 0; shieldHint = 0; zoom = 1;
+  stormMix = 0; stormFlash = 0; stormTimer = 6;
+  stormActive = false; stormNext = 12; stormDur = 0;
+  bgm.currentTime = 0; bgm.pause();
+}
+
+// 生成破碎碎片
+function spawnShards(o){
+  const colors = o.type==='heli'
+    ? ['#8B939B','#4E7A4E','#FF4D4D','#9FD8E8','#3D4A5A']
+    : (o.type==='croc' ? ['#4E8A3A','#3E6E2E','#6AA84F','#2F5A24'] : ['#8B939B','#6E767E','#AAB0B6']);
+  const n = o.type==='heli' ? 16 : 10;
+  for (let i=0;i<n;i++){
+    shards.push({
+      x: o.x + (Math.random()-0.5)*o.w,
+      y: o.y - Math.random()*o.h,
+      vx: (Math.random()-0.35)*7,
+      vy: -Math.random()*7 - 1,
+      rot: Math.random()*6.28,
+      vr: (Math.random()-0.5)*0.4,
+      size: 3 + Math.random()*5,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      life: 0.6 + Math.random()*0.3
+    });
+  }
+}
+
+// ---------- 直升机吊挂 GIF（帧序列播放，动画保证动起来） ----------
+const HELI_FRAMES = 158, HELI_FPS = 11.11;   // 原 GIF 90ms/帧 ≈ 11.1fps
+const heliFrames = [];
+for (let i=0;i<HELI_FRAMES;i++){
+  const img = new Image();
+  img.src = 'assets/heli/frame_' + String(i).padStart(3,'0') + '.jpg';
+  heliFrames.push(img);
+}
+const HELI_H = 46;                        // GIF 显示高度（碰撞基准，蹲下正好躲过）
+const HELI_W = 63.5;                      // 221/160 = 1.381 比例
+// 直升机出场音效（实例池：多架同时进场时音效可重叠）
+const HELI_SFX_POOL_SIZE = 3;
+const heliSfxPool = [];
+for (let i=0;i<HELI_SFX_POOL_SIZE;i++){
+  const a = new Audio('assets/heli_sfx.mp3');
+  a.preload = 'auto';
+  heliSfxPool.push(a);
+}
+let heliSfxIdx = 0;
+function playHeliSfx(){
+  // 优先找空闲实例；全部在播才轮换打断（3 池足够覆盖同时进场场景）
+  let a = null;
+  for (let i=0;i<HELI_SFX_POOL_SIZE;i++){
+    const cand = heliSfxPool[(heliSfxIdx + i) % HELI_SFX_POOL_SIZE];
+    if (cand.paused || cand.ended){ a = cand; break; }
+  }
+  if (!a) a = heliSfxPool[heliSfxIdx];
+  heliSfxIdx = (heliSfxIdx + 1) % HELI_SFX_POOL_SIZE;
+  a.currentTime = 0;
+  a.play().catch(function(){});
+}
+
+// ===== 背景音乐（BGM：放完 = 到达终点 = 通关） =====
+const bgm = new Audio('assets/bgm.mp3');
+bgm.preload = 'auto';
+bgm.addEventListener('ended', function(){
+  if (state === 'playing') winGame();
+});
+
+// ===== 复活音效（奶鱼护体触发时播放） =====
+const reviveSfx = new Audio('assets/revive_sfx.mp3');
+reviveSfx.preload = 'auto';
+
+// ---------- 生成障碍 / 奶鱼 ----------
+function spawnObstacle(){
+  const r = Math.random();
+  let o;
+  if (r < 0.3){                                    // 大石块（超大）
+    o = { type:'rock', x:VW+40, w:58, h:42, y:GROUND_Y };
+  } else if (r < 0.84){                            // 大石块（大，含原鳄鱼区间）
+    o = { type:'rock', x:VW+40, w:44, h:32, y:GROUND_Y };
+  } else if (r < 0.9){
+    if (night){                                    // 鳄鱼：仅黑夜，频率 6%（原 30% 的五分之一）
+      o = { type:'croc', x:VW+40, w:136, h:48, y:GROUND_Y, vx: 3.2 };
+    } else {                                       // 白天无鳄鱼：该区间归给石头
+      o = { type:'rock', x:VW+40, w:44, h:32, y:GROUND_Y };
+    }
+  } else {                                         // 武装直升机（吊着 GIF 货物，低概率）
+    o = { type:'heli', x:VW+60, w:HELI_W, h:HELI_H, y:GROUND_Y-50 };
+  }
+  obstacles.push(o);
+}
+
+// ---------- 主更新 ----------
+function update(dt){
+  if (state !== 'playing') return;
+  const k = dt*60;                                  // 归一化到 60fps 基准
+  dino.animT += dt;
+
+  // 速度随距离分递增（每280分+1，上限14.5；与显示分独立，保证难度曲线不变）
+  speed = Math.min(6 + distScore/280, 14.5);
+  distScore += speed * 0.02 * k;
+  // 显示分 = BGM 进度 × 9999（匀速增长，终点正好 9999）
+  const progress = (isFinite(bgm.duration) && bgm.duration > 0) ? Math.min(1, bgm.currentTime/bgm.duration) : 0;
+  score = Math.floor(progress * 9999);
+  night = (Math.floor(distScore/400) % 2) === 1;        // 日夜切换（按距离分，保持原节奏）
+  nightMix += ((night ? 1 : 0) - nightMix) * Math.min(1, dt*1.6);   // 平滑渐变过渡
+  // ==== 雷暴天（BGM 过半后事件式触发；接近终点时停止） ====
+  const halfReached = (isFinite(bgm.duration) && bgm.duration > 0 && bgm.currentTime/bgm.duration > 0.5);
+  const ending = (isFinite(bgm.duration) && bgm.duration - bgm.currentTime <= 6);   // 接近终点（剩余≤6秒）禁天气/障碍
+  if (halfReached && !ending){
+    if (!stormActive){
+      stormNext -= dt;
+      if (stormNext <= 0){
+        stormActive = true;
+        stormDur = 15 + Math.random()*15;   // 雷暴持续 15~30 秒
+      }
+    } else {
+      stormDur -= dt;
+      if (stormDur <= 0){
+        stormActive = false;
+        stormNext = 20 + Math.random()*25;  // 20~45 秒后可能再次雷暴
+      }
+    }
+  } else {
+    stormActive = false;
+    stormNext = 12;
+  }
+  const stormTarget = (halfReached && !ending && stormActive) ? 1 : 0;
+  stormMix += (stormTarget - stormMix) * Math.min(1, dt*0.8);
+  // 闪电（雷暴进行中偶尔触发，闪下时全屏白一下）
+  if (stormMix > 0.4){
+    stormTimer -= dt;
+    if (stormTimer <= 0){
+      stormFlash = 0.9;
+      stormTimer = 4 + Math.random()*5;      // 4~9 秒一次
+      setTimeout(sfxThunder, 250);           // 闪电先见，雷声后至
+    }
+  }
+  stormFlash = Math.max(0, stormFlash - dt*1.5);   // 白闪衰减放慢（约 0.6 秒，更有存在感）
+  groundOffset = (groundOffset + speed*k) % 24;
+
+  // ==== 雾天事件（前一半仅夜晚起雾；后一半随时；接近终点不再起雾） ====
+  // halfReached / ending 已在雷暴逻辑中声明，此处复用
+  const fogAllowed = !ending && (halfReached || night);      // 接近终点禁雾
+  if (!fogAllowed){
+    fog.active = false;                          // 白天前半段：强制无雾
+    fog.nextIn = 8;
+    fog.opacity = Math.max(0, fog.opacity - dt*2.2);
+  } else if (!fog.active){
+    fog.nextIn -= dt;
+    if (fog.nextIn <= 0){
+      fog.active = true;
+      fog.duration = 8 + Math.random()*8;   // 持续 8~16 秒
+      fog.hint = 2.2;
+    }
+  } else {
+    fog.timer += dt;
+    fog.duration -= dt;
+    if (fog.duration <= 0){
+      fog.active = false;
+      fog.nextIn = 12 + Math.random()*12;  // 12~24 秒后可能再次起雾
+    }
+  }
+  const fogTarget = fog.active ? 1 : 0;
+  fog.opacity += (fogTarget - fog.opacity) * Math.min(1, dt*2.2);   // 平滑淡入淡出
+  if (fog.hint > 0) fog.hint -= dt;
+
+  // 奶龙物理
+  if (!dino.onGround){
+    dino.vy += 0.55 * k;
+    dino.y  += dino.vy * k;
+    if (dino.y >= GROUND_Y){ dino.y = GROUND_Y; dino.vy = 0; dino.onGround = true; if (dino.mode==='jump') dino.mode='run'; }
+  }
+  // 蹲下由长按控制（pressDuck/releaseDuck），无自动站起
+
+  // 障碍 / 奶鱼移动
+  for (const o of obstacles){
+    o.x -= speed*k;
+    if (o.type === 'croc') o.x -= (o.vx||0)*k;   // 鳄鱼额外爬行速度（比石头快）
+    // 直升机进场瞬间播放出场音效（每架只响一次，实例池支持重叠）
+    if (o.type === 'heli' && !o.sfxPlayed && o.x <= VW + 60){
+      o.sfxPlayed = true;
+      playHeliSfx();
+    }
+  }
+  obstacles = obstacles.filter(o => o.x > -60);
+  for (const f of fishes) f.x -= speed*k;
+  fishes = fishes.filter(f => f.x > -40);
+
+  // 生成节奏（接近终点 ending 时停止生成障碍/奶鱼，专心冲刺）
+  if (!ending){
+    spawnDist -= speed*k;
+    if (spawnDist <= 0){
+      spawnObstacle();
+      // 奶鱼高度随机（地面以上 68~98px，跳跃可及），出现频率 8.3%（25%÷3，保命道具更稀有）
+      if (Math.random() < 0.25/3) fishes.push({ x:VW+180, y:GROUND_Y-(68+Math.random()*30), w:20, h:13 });
+      // 障碍间隔分段随机（打破均匀）：30% 密集段 / 50% 普通段 / 20% 稀疏段
+      // 后四分之一段（progress>0.75，速度触顶）间距整体加大，避免连跳不及
+      const distR = Math.random();
+      const lateGap = progress > 0.75 ? 200 : 0;
+      if (distR < 0.3)      spawnDist = (300 + lateGap) + Math.random()*150;   // 密集段 300~450（后期 500~650）
+      else if (distR < 0.8) spawnDist = (500 + lateGap) + Math.random()*300;   // 普通段 500~800（后期 700~1000）
+      else                  spawnDist = (900 + lateGap) + Math.random()*400;   // 稀疏段 900~1300（后期 1100~1500）
+    }
+  }
+
+  // 无敌倒计时 / 护体提示
+  if (invincible > 0) invincible -= dt;
+  if (shieldHint > 0) shieldHint -= dt;
+
+  // 碰撞（AABB，内缩容错 4~6px 保证手感）
+  const dbox = dino.mode==='duck'
+    ? { x1:dino.x-26, y1:dino.y-47, x2:dino.x+26, y2:dino.y }
+    : { x1:dino.x-22, y1:dino.y-65, x2:dino.x+22, y2:dino.y };
+  if (invincible <= 0){
+    for (let i=obstacles.length-1;i>=0;i--){
+      const o = obstacles[i];
+      const ob = { x1:o.x-o.w/2+5, y1:o.y-o.h+3, x2:o.x+o.w/2-5, y2:o.y-2 };
+      if (dbox.x1<ob.x2 && dbox.x2>ob.x1 && dbox.y1<ob.y2 && dbox.y2>ob.y1){
+        if (fishCount > 0){
+          // 保命：奶鱼 -1，障碍破碎，短暂无敌 + 复活音效
+          fishCount--;
+          spawnShards(o);
+          obstacles.splice(i,1);
+          invincible = 1.5;
+          shieldHint = 1.2;
+          reviveSfx.currentTime = 0;
+          reviveSfx.play().catch(function(){});
+        } else {
+          gameOver(); return;
+        }
+      }
+    }
+  }
+  for (let i=fishes.length-1;i>=0;i--){
+    const f = fishes[i];
+    if (dbox.x1<f.x+9 && dbox.x2>f.x-9 && dbox.y1<f.y+6.5 && dbox.y2>f.y-6.5){
+      fishes.splice(i,1); fishCount++; sfx.fish();   // 奶鱼：保命+计数（不再加分，保证终点正好9999）
+    }
+  }
+  // 碎片物理（重力 + 摩擦 + 旋转）
+  for (let i=shards.length-1;i>=0;i--){
+    const s = shards[i];
+    s.life -= dt;
+    if (s.life <= 0){ shards.splice(i,1); continue; }
+    s.vy += 0.5 * k;
+    s.x += s.vx * k;
+    s.y += s.vy * k;
+    s.vx *= 0.98;
+    s.rot += s.vr * k;
+  }
+}
+
+function gameOver(){
+  state = 'gameover'; sfx.hit();
+  bgm.pause();
+  btnRestart.style.display = 'block';          // 必须点击按钮才能再来一局
+  if (Math.floor(score) > best){
+    best = Math.floor(score);
+    try { localStorage.setItem('nailongRunBest', best); } catch(e){}
+  }
+}
+
+function winGame(){
+  // 音乐放完 = 到达雪峰 = 通关！得分定格 9999（完美通关彩蛋）
+  score = 9999;
+  state = 'win';
+  winStart = performance.now();
+  zoom = 0.8;
+  btnRestart.style.display = 'block';
+  if (Math.floor(score) > best){
+    best = Math.floor(score);
+    try { localStorage.setItem('nailongRunBest', best); } catch(e){}
+  }
+  // 胜利三连音
+  beep(523, 784, .18, 'sine', .15);
+  setTimeout(function(){ beep(659, 988, .18, 'sine', .15); }, 180);
+  setTimeout(function(){ beep(784, 1175, .32, 'sine', .18); }, 360);
+}
+
+// ---------- 绘制：奶龙（直立大胖子 · 程序绘制） ----------
+function drawDino(){
+  const t = dino.animT;
+  ctx.save();
+  let bob = 0, sx = 1, sy = 1, lean = 0;
+  if (dino.mode === 'run'  && dino.onGround) bob = Math.sin(t*13)*3.2;
+  if (dino.mode === 'jump'){ sy = 1.05; lean = -0.06; }
+  if (dino.mode === 'duck'){ sy = 0.72; sx = 1.15; lean = 0.12; }
+  ctx.translate(dino.x, dino.y + bob);
+  ctx.rotate(lean);
+  ctx.scale(sx*1.3, sy*1.3);   // 整体放大 1.3 倍
+
+  const step = dino.onGround && dino.mode==='run' ? Math.sin(t*13) : 0;
+  const lift = Math.abs(step)*4;
+  const crouched = (dino.mode==='jump' || dino.mode==='duck');
+
+  // ===== 腿（直立行走，交替迈步） =====
+  ctx.fillStyle = '#FFD93D';
+  if (crouched){
+    // 跳跃/蹲下：腿弯曲并拢
+    ctx.beginPath(); ctx.ellipse(-5, -3, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( 5, -3, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+  } else {
+    // 跑步：左腿前右腿后，交替迈步 + 抬腿
+    ctx.beginPath(); ctx.ellipse(-6 + step*6, -4 - lift, 4.2, 8 - lift*0.5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( 6 - step*6, -4 - lift, 4.2, 8 - lift*0.5, 0, 0, Math.PI*2); ctx.fill();
+  }
+  // 脚掌（贴地小圆）
+  if (!crouched){
+    ctx.fillStyle = '#F5C84A';
+    ctx.beginPath(); ctx.ellipse(-6 + step*6, -1, 4.6, 2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( 6 - step*6, -1, 4.6, 2, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ===== 尾巴（屁股后面，跑动甩） =====
+  ctx.save();
+  ctx.translate(-16, -20);
+  ctx.rotate(Math.sin(t*13)*0.25 + (dino.mode==='jump'?0.5:0));
+  ctx.fillStyle = '#FFD93D';
+  ctx.beginPath(); ctx.ellipse(-3, 0, 6.5, 4.2, -0.5, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // ===== 身体（竖椭圆，圆滚滚） =====
+  ctx.fillStyle = '#FFD93D';
+  ctx.beginPath(); ctx.ellipse(0, -26, 17, 20, 0, 0, Math.PI*2); ctx.fill();
+
+  // ===== 大肚皮（白色凸出） =====
+  ctx.fillStyle = '#FFF6E5';
+  ctx.beginPath(); ctx.ellipse(1.5, -17, 13, 12, 0, 0, Math.PI*2); ctx.fill();
+
+  // ===== 手臂（小短手，跑步摆动） =====
+  const armSwing = dino.onGround && dino.mode==='run' ? Math.sin(t*13)*0.5 : (dino.mode==='jump' ? -0.5 : 0.35);
+  ctx.fillStyle = '#FFD93D';
+  ctx.save(); ctx.translate(14, -22); ctx.rotate(-armSwing);
+  ctx.beginPath(); ctx.ellipse(0, 2, 3.5, 5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.save(); ctx.translate(-14, -22); ctx.rotate(armSwing);
+  ctx.beginPath(); ctx.ellipse(0, 2, 3.5, 5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // ===== 头（大圆，圆滚滚，叠在身体正上方） =====
+  ctx.fillStyle = '#FFD93D';
+  ctx.beginPath(); ctx.arc(4, -46, 13, 0, Math.PI*2); ctx.fill();
+
+  // ===== 背棘 + 头顶角（橙） =====
+  // （主人指示：去掉橙色三角，奶龙光溜溜圆滚滚）
+
+  // ===== 眼睛（大眼呆萌） =====
+  ctx.fillStyle = '#2B2B2B';
+  ctx.beginPath(); ctx.arc(9, -49, 3.8, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(10.5, -50.5, 1.4, 0, Math.PI*2); ctx.fill();
+
+  // ===== 笑脸（褐色曲线，眼睛右下方） =====
+  ctx.strokeStyle = '#8B5A2B';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(12.5, -44);
+  ctx.quadraticCurveTo(14.5, -40.5, 16.5, -44);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ---------- 绘制：鳄鱼（地上爬，会自己前进） ----------
+function drawCroc(x, y, t, w, h){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(-1, 1);                             // 朝向修正：嘴朝左（面向奶龙爬来）
+  const crawl = Math.sin(t*12);                 // 爬行节奏
+  ctx.translate(0, -Math.abs(crawl)*1.5);       // 身体起伏
+  // 尾巴（后摆）
+  ctx.save();
+  ctx.translate(-w*0.42, -h*0.5);
+  ctx.rotate(Math.sin(t*12)*0.4 + 0.25);
+  ctx.fillStyle = '#5C8C3C';
+  ctx.beginPath(); ctx.ellipse(-w*0.14, 0, w*0.16, h*0.24, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  // 身体（长条）
+  ctx.fillStyle = '#4E8A3A';
+  ctx.beginPath(); ctx.ellipse(0, -h*0.55, w*0.42, h*0.45, 0, 0, Math.PI*2); ctx.fill();
+  // 背部鳞片纹路
+  ctx.fillStyle = '#3E6E2E';
+  for (let i=0;i<4;i++){
+    const bx = -w*0.3 + i*w*0.18;
+    ctx.beginPath(); ctx.arc(bx, -h*0.88, h*0.14, 0, Math.PI*2); ctx.fill();
+  }
+  // 头（前伸）
+  ctx.fillStyle = '#4E8A3A';
+  ctx.beginPath(); ctx.ellipse(w*0.36, -h*0.5, w*0.17, h*0.3, 0.15, 0, Math.PI*2); ctx.fill();
+  // 嘴（下颚张开）
+  ctx.fillStyle = '#3E6E2E';
+  ctx.beginPath(); ctx.ellipse(w*0.5, -h*0.26, w*0.13, h*0.18, 0.1, 0, Math.PI*2); ctx.fill();
+  // 牙齿
+  ctx.fillStyle = '#FFF';
+  for (let i=0;i<3;i++){
+    const tx = w*0.42 + i*w*0.065;
+    ctx.beginPath();
+    ctx.moveTo(tx, -h*0.16); ctx.lineTo(tx+h*0.06, -h*0.28); ctx.lineTo(tx+h*0.12, -h*0.16);
+    ctx.closePath(); ctx.fill();
+  }
+  // 眼睛
+  ctx.fillStyle = '#FFF';
+  ctx.beginPath(); ctx.arc(w*0.44, -h*0.78, h*0.13, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#2B2B2B';
+  ctx.beginPath(); ctx.arc(w*0.455, -h*0.78, h*0.065, 0, Math.PI*2); ctx.fill();
+  // 四只腿交替爬行
+  for (let i=0;i<4;i++){
+    const lx = -w*0.28 + i*w*0.19;
+    const phase = (i%2===0) ? crawl : -crawl;
+    ctx.fillStyle = '#4E8A3A';
+    ctx.beginPath();
+    ctx.ellipse(lx + phase*2, -h*0.14, h*0.1, h*0.2, phase*0.3, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ---------- 绘制：障碍 ----------
+function drawChili(x, y, h){
+  ctx.fillStyle = '#FF4D4D';
+  ctx.beginPath(); ctx.ellipse(x, y-h*0.55, 7.5, h*0.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#2ECC71';
+  ctx.beginPath(); ctx.moveTo(x-4.5, y-h*0.95); ctx.lineTo(x, y-h-3); ctx.lineTo(x+4.5, y-h*0.95); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.beginPath(); ctx.ellipse(x-2.5, y-h*0.65, 2, 3.5, 0.4, 0, Math.PI*2); ctx.fill();
+}
+function drawRock(x, y, w, h){
+  // 大石块：棱角分明 + 高光面 + 裂纹 + 苔藓
+  ctx.fillStyle = '#8B939B';
+  ctx.beginPath();
+  ctx.moveTo(x-w/2, y);
+  ctx.lineTo(x-w/2+6, y-h+6);
+  ctx.lineTo(x-w/2+12, y-h-2);
+  ctx.lineTo(x-w/8, y-h);
+  ctx.lineTo(x+w/8, y-h+4);
+  ctx.lineTo(x+w/2-8, y-h+2);
+  ctx.lineTo(x+w/2, y-h+8);
+  ctx.lineTo(x+w/2, y);
+  ctx.closePath(); ctx.fill();
+  // 高光面
+  ctx.fillStyle = 'rgba(255,255,255,.25)';
+  ctx.beginPath();
+  ctx.moveTo(x-w/2+8, y-4);
+  ctx.lineTo(x-w/2+12, y-h+8);
+  ctx.lineTo(x-w/8, y-h+2);
+  ctx.lineTo(x-w/8, y-4);
+  ctx.closePath(); ctx.fill();
+  // 裂纹
+  ctx.strokeStyle = 'rgba(60,70,80,.5)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x-w/6, y-h+2);
+  ctx.lineTo(x-w/14, y-h*0.55);
+  ctx.lineTo(x-w/8, y-h*0.25);
+  ctx.stroke();
+  // 苔藓
+  ctx.fillStyle = 'rgba(90,180,90,.7)';
+  ctx.beginPath(); ctx.ellipse(x+w*0.18, y-h*0.68, 3.5, 2.5, 0.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x-w*0.22, y-h*0.4, 2.5, 2, -0.3, 0, Math.PI*2); ctx.fill();
+  // 底部阴影
+  ctx.fillStyle = 'rgba(0,0,0,.12)';
+  ctx.beginPath(); ctx.ellipse(x, y, w*0.55, 3, 0, 0, Math.PI*2); ctx.fill();
+}
+function drawHeliBody(x, y, t){
+  // 侧视像素军用直升机（放大版，机头朝左 = 迎面飞来）
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(-1, 1);                       // 朝向修正：机头朝左
+  // 主旋翼（侧视细长横杆，微摆）
+  ctx.save();
+  ctx.translate(16, -52);
+  ctx.rotate(Math.sin(t*30)*0.05);
+  ctx.fillStyle = '#3D4A5A';
+  ctx.fillRect(-130, -3.5, 260, 7);
+  ctx.fillStyle = '#555F6E';
+  ctx.fillRect(-130, -3.5, 260, 3);
+  ctx.restore();
+  // 旋翼轴
+  ctx.fillStyle = '#2A3340';
+  ctx.fillRect(6, -58, 14, 30);
+  // 尾梁（后伸）
+  ctx.fillStyle = '#4E7A4E';
+  ctx.fillRect(-110, -12, 70, 14);
+  // 尾旋翼（侧视小圆）
+  ctx.fillStyle = '#3D4A5A';
+  ctx.beginPath(); ctx.arc(-112, -11, 8, 0, Math.PI*2); ctx.fill();
+  // 机身主体（放大侧视，机头圆润）
+  ctx.fillStyle = '#4E7A4E';
+  ctx.beginPath();
+  ctx.moveTo(-50, -15);
+  ctx.lineTo(72, -15);
+  ctx.quadraticCurveTo(110, -15, 110, 6);
+  ctx.lineTo(-46, 15);
+  ctx.lineTo(-50, 15);
+  ctx.closePath(); ctx.fill();
+  // 机头亮部
+  ctx.fillStyle = '#5C8C5C';
+  ctx.beginPath();
+  ctx.moveTo(72, -15); ctx.quadraticCurveTo(110, -15, 110, 6); ctx.lineTo(80, 6); ctx.lineTo(72, -2);
+  ctx.closePath(); ctx.fill();
+  // 座舱玻璃（凸起）
+  ctx.fillStyle = '#9FD8E8';
+  ctx.beginPath();
+  ctx.moveTo(8, -15); ctx.quadraticCurveTo(48, -30, 72, -15); ctx.lineTo(8, -15);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.beginPath(); ctx.moveTo(22, -17); ctx.quadraticCurveTo(42, -26, 54, -17); ctx.lineTo(22,-17); ctx.closePath(); ctx.fill();
+  // 起落架
+  ctx.strokeStyle = '#3A4A3A';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-24, 15); ctx.lineTo(-32, 25);
+  ctx.moveTo(32, 15);  ctx.lineTo(40, 25);
+  ctx.stroke();
+  ctx.fillStyle = '#3A4A3A';
+  ctx.fillRect(-44, 25, 88, 6);
+  // 警示灯（红闪，尾梁上）
+  ctx.fillStyle = (Math.floor(t*4)%2===0) ? '#FF5555' : '#7A2020';
+  ctx.beginPath(); ctx.arc(-96, -20, 5, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawHeli(x, y, t, w, h){
+  // y = GIF 货物底部；w/h = GIF 显示尺寸
+  const swing = Math.sin(t*1.8)*0.14;      // 摆动角
+  const sx    = Math.sin(t*1.8)*7;         // 横向摆幅
+  // 直升机位置（侧视低空悬停，跳跃碰不到）
+  const hx = x, hy = GROUND_Y - 180;
+  // 吊绳（短）：机腹 → GIF 吊点
+  const hookX = x + sx, hookY = y - h;
+  ctx.strokeStyle = 'rgba(230,230,230,.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(hx, hy + 25); ctx.lineTo(hookX, hookY); ctx.stroke();
+  // 吊挂 GIF（帧序列播放，绕吊点摆动）
+  ctx.save();
+  ctx.translate(hookX, hookY);
+  ctx.rotate(swing);
+  const fi = Math.floor(t*HELI_FPS) % HELI_FRAMES;
+  ctx.drawImage(heliFrames[fi], -w/2, 0, w, h);
+  ctx.restore();
+  // 直升机本体
+  drawHeliBody(hx, hy, t);
+}
+function drawFish(x, y){
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = '#FFC93C';
+  ctx.beginPath(); ctx.ellipse(0, 0, 10, 6.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-15, -6); ctx.lineTo(-15, 6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2B2B2B';
+  ctx.beginPath(); ctx.arc(4, -2, 1.6, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.beginPath(); ctx.arc(6.5, -3.5, 1, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// ---------- 颜色插值（昼夜渐变用） ----------
+function lerpColor(a, b, t){
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const r = Math.round(((pa>>16)&255) + (((pb>>16)&255)-((pa>>16)&255))*t);
+  const g = Math.round(((pa>>8)&255) + (((pb>>8)&255)-((pa>>8)&255))*t);
+  const bl = Math.round((pa&255) + ((pb&255)-(pa&255))*t);
+  return 'rgb(' + r + ',' + g + ',' + bl + ')';
+}
+
+// ---------- 绘制：雷暴雨滴（斜风细雨） ----------
+function drawRain(t){
+  if (stormMix <= 0.02) return;
+  ctx.strokeStyle = 'rgba(200,220,255,' + (0.45*stormMix) + ')';
+  ctx.lineWidth = 1.2;
+  for (let i=0;i<60;i++){
+    const sp = 500 + (i%5)*90;                       // 每滴速度（视差）
+    const yy = ((i*37 + t*sp) % (VH+50)) - 25;       // 循环下落
+    const xx = ((i*97) % (VW+90)) - 45 + yy*0.18;    // 斜向（风）
+    ctx.beginPath();
+    ctx.moveTo(xx, yy);
+    ctx.lineTo(xx + 3, yy + 14);
+    ctx.stroke();
+  }
+}
+
+// ---------- 绘制：背景 ----------
+function drawBackground(t){
+  const p = nightMix;                                 // 0=白天 1=夜晚
+  const sky  = lerpColor(PAL.day.sky,  PAL.night.sky,  p);
+  const sky2 = lerpColor(PAL.day.sky2, PAL.night.sky2, p);
+  const hill = lerpColor(PAL.day.hill, PAL.night.hill, p);
+  const ground = lerpColor(PAL.day.ground, PAL.night.ground, p);
+  const line  = lerpColor(PAL.day.line, PAL.night.line, p);
+  const cloudA = 0.9 - 0.8*p;                          // 云随夜晚变淡
+  const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+  g.addColorStop(0, sky); g.addColorStop(1, sky2);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VW, GROUND_Y);
+  // 星星（随夜晚程度渐显）
+  if (p > 0.02){
+    ctx.fillStyle = 'rgba(255,255,255,.8)';
+    for (const s of stars){
+      const a = (0.5 + 0.5*Math.sin(t*2 + s.tw)) * p;
+      ctx.globalAlpha = a; ctx.fillRect(s.x, s.y, s.r, s.r);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // 云（视差）
+  ctx.fillStyle = 'rgba(255,255,255,' + cloudA + ')';
+  for (const c of clouds){
+    const cx = ((c.x - t*8*c.s) % (VW+160) + VW+160) % (VW+160) - 80;
+    ctx.beginPath();
+    ctx.ellipse(cx, c.y, 26*c.s, 12*c.s, 0, 0, Math.PI*2);
+    ctx.ellipse(cx+18*c.s, c.y+3*c.s, 18*c.s, 9*c.s, 0, 0, Math.PI*2);
+    ctx.ellipse(cx-18*c.s, c.y+4*c.s, 15*c.s, 8*c.s, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // 远山
+  ctx.fillStyle = hill;
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y);
+  for (let x=0; x<=VW; x+=40){
+    ctx.lineTo(x, GROUND_Y-14 - Math.sin(x*0.008 + 1)*10 - Math.sin(x*0.021)*6);
+  }
+  ctx.lineTo(VW, GROUND_Y);
+  ctx.closePath(); ctx.fill();
+  // 地面（扩大覆盖，镜头拉远时不露矩形边界）
+  ctx.fillStyle = ground;
+  ctx.fillRect(-120, GROUND_Y, VW+240, VH-GROUND_Y+120);
+  ctx.fillStyle = line;
+  ctx.fillRect(0, GROUND_Y, VW, 2);
+  // 滚动小草
+  ctx.fillStyle = line;
+  for (let x=-24; x<VW+24; x+=24){
+    const gx = x + groundOffset;
+    ctx.fillRect(gx, GROUND_Y+8, 2, 5);
+    ctx.fillRect(gx+10, GROUND_Y+5, 2, 4);
+  }
+}
+
+// ---------- 绘制：UI ----------
+function roundRect(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+function drawUI(){
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(43,43,43,.75)';
+  ctx.font = 'bold 22px "Microsoft YaHei", monospace';
+  ctx.fillText('得分 ' + Math.floor(score), 20, 16);
+  ctx.font = 'bold 14px "Microsoft YaHei", monospace';
+  ctx.fillStyle = 'rgba(43,43,43,.55)';
+  ctx.fillText('最高 ' + best, 20, 44);
+  // 奶鱼计数
+  drawFish(20, 66);
+  ctx.fillStyle = 'rgba(43,43,43,.6)';
+  ctx.fillText('× ' + fishCount, 36, 62);
+}
+function drawReady(){
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(43,43,43,.85)';
+  ctx.font = 'bold 52px "Microsoft YaHei", sans-serif';
+  ctx.fillText('奶 龙 快 跑', VW/2, 62);
+  ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
+  ctx.fillStyle = '#E8590C';
+  ctx.fillText('冲鸭！越过石块，蹲下躲避直升机，冲向最终彩蛋!!!', VW/2, 122);
+  ctx.font = '16px "Microsoft YaHei", sans-serif';
+  ctx.fillStyle = 'rgba(43,43,43,.65)';
+  ctx.fillText('空格 / 点击 = 跳跃    按住 ↓ = 蹲下（手机长按蹲键）', VW/2, 150);
+  ctx.fillStyle = '#2B8A3E';
+  ctx.font = 'bold 24px "Microsoft YaHei", sans-serif';
+  const blink = Math.sin(performance.now()/300) > 0 ? 1 : 0.35;
+  ctx.globalAlpha = blink;
+  ctx.fillText('按 空格 / 点击 开始', VW/2, 190);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+function drawGameOver(){
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.fillRect(0, 0, VW, VH);
+  ctx.save();
+  ctx.fillStyle = '#FFF6E5';
+  roundRect(VW/2-170, 78, 340, 150, 16);
+  ctx.fill();
+  ctx.strokeStyle = '#FFB020'; ctx.lineWidth = 4;
+  roundRect(VW/2-170, 78, 340, 150, 16);
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#E8590C';
+  ctx.font = 'bold 30px "Microsoft YaHei", sans-serif';
+  ctx.fillText('撞到啦！(>ω<)', VW/2, 100);
+  ctx.fillStyle = '#2B2B2B';
+  ctx.font = 'bold 22px "Microsoft YaHei", sans-serif';
+  ctx.fillText('得分 ' + Math.floor(score) + '    最高 ' + best, VW/2, 140);
+  if (Math.floor(score) >= best && score > 0){
+    ctx.fillStyle = '#F59F00';
+    ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
+    const blink = Math.sin(performance.now()/250) > 0 ? 1 : 0.3;
+    ctx.globalAlpha = blink;
+    ctx.fillText('★ 新纪录！ ★', VW/2, 168);
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = 'rgba(43,43,43,.7)';
+  ctx.font = '15px "Microsoft YaHei", sans-serif';
+  ctx.fillText('奶鱼 × ' + fishCount + '    点击下方按钮再来一局', VW/2, 196);
+  ctx.restore();
+}
+
+// ---------- 绘制：雾天 ----------
+function drawFog(){
+  if (fog.opacity <= 0.01) return;
+  const a = fog.opacity;
+  // 雾色随天气：白天=白雾，夜晚/雷暴=蓝灰雾
+  const cool = Math.max(nightMix, stormMix);
+  const R1 = Math.round(190 + (245-190)*cool);
+  const G1 = Math.round(205 + (245-205)*cool);
+  const B1 = Math.round(225 + (240-225)*cool);
+  const R2 = Math.round(170 + (240-170)*cool);
+  const G2 = Math.round(185 + (240-185)*cool);
+  const B2 = Math.round(210 + (235-210)*cool);
+  // 全屏雾底
+  const g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, 'rgba(' + R1 + ',' + G1 + ',' + B1 + ',' + (0.30*a) + ')');
+  g.addColorStop(1, 'rgba(' + R2 + ',' + G2 + ',' + B2 + ',' + (0.45*a) + ')');
+  ctx.fillStyle = g;
+  ctx.fillRect(-120, -120, VW+240, VH+240);   // 扩大覆盖，镜头拉远时不露雾的矩形边界
+  // 右侧更浓（障碍来向，视线受阻重）
+  const g2 = ctx.createLinearGradient(VW*0.45, 0, VW, 0);
+  g2.addColorStop(0, 'rgba(' + R1 + ',' + G1 + ',' + B1 + ',0)');
+  g2.addColorStop(1, 'rgba(' + R1 + ',' + G1 + ',' + B1 + ',' + (0.55*a) + ')');
+  ctx.fillStyle = g2;
+  ctx.fillRect(-120, -120, VW+240, VH+240);   // 扩大覆盖
+  // 飘动雾团
+  const R3 = Math.round(200 + (250-200)*cool);
+  const G3 = Math.round(215 + (250-215)*cool);
+  const B3 = Math.round(235 + (245-235)*cool);
+  ctx.fillStyle = 'rgba(' + R3 + ',' + G3 + ',' + B3 + ',' + (0.26*a) + ')';
+  for (let i=0;i<5;i++){
+    const fx = ((fog.timer*(18+i*6) + i*180) % (VW+320)) - 160;
+    const fy = 80 + i*38 + Math.sin(fog.timer*0.5 + i)*12;
+    ctx.beginPath(); ctx.ellipse(fx, fy, 130+i*24, 42, 0, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+// ---------- 绘制：终点雪峰 ----------
+function drawSnowMountain(x){
+  const baseY = GROUND_Y + 2;
+  const peakH = 130;
+  const p = nightMix;
+  // 山体（蓝灰渐变，随昼夜插值）
+  const g = ctx.createLinearGradient(0, baseY-peakH, 0, baseY);
+  g.addColorStop(0, lerpColor('#D8E4F0', '#B8C4D8', p));
+  g.addColorStop(1, lerpColor('#8FA3B8', '#5A6A80', p));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x-95, baseY);
+  ctx.lineTo(x-30, baseY-peakH);
+  ctx.lineTo(x+60, baseY-peakH*0.6);
+  ctx.lineTo(x+100, baseY);
+  ctx.closePath(); ctx.fill();
+  // 主峰积雪
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
+  ctx.beginPath();
+  ctx.moveTo(x-30, baseY-peakH);
+  ctx.lineTo(x-14, baseY-peakH+26);
+  ctx.lineTo(x+6,  baseY-peakH+14);
+  ctx.lineTo(x+24, baseY-peakH+32);
+  ctx.lineTo(x+60, baseY-peakH*0.6);
+  ctx.lineTo(x-30, baseY-peakH);
+  ctx.closePath(); ctx.fill();
+  // 副峰（左侧）
+  ctx.fillStyle = lerpColor('#8FA3B8', '#5A6A80', p);
+  ctx.beginPath();
+  ctx.moveTo(x-155, baseY);
+  ctx.lineTo(x-100, baseY-72);
+  ctx.lineTo(x-42, baseY);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.beginPath();
+  ctx.moveTo(x-100, baseY-72);
+  ctx.lineTo(x-86, baseY-52);
+  ctx.lineTo(x-64, baseY-66);
+  ctx.closePath(); ctx.fill();
+  // 山腰雪痕
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  ctx.beginPath();
+  ctx.moveTo(x-2, baseY-peakH+34);
+  ctx.lineTo(x+10, baseY-peakH+46);
+  ctx.lineTo(x+24, baseY-peakH+32);
+  ctx.lineTo(x-2, baseY-peakH+34);
+  ctx.closePath(); ctx.fill();
+  // 底部云雾
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.beginPath(); ctx.ellipse(x-25, baseY-6, 135, 15, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.2)';
+  ctx.beginPath(); ctx.ellipse(x-70, baseY-16, 95, 12, 0, 0, Math.PI*2); ctx.fill();
+}
+
+// ---------- 绘制：BGM 进度条（草坪位置） ----------
+function drawProgress(){
+  if (state !== 'playing') return;
+  const dur = bgm.duration;
+  if (!isFinite(dur) || dur <= 0) return;
+  const p = Math.min(1, bgm.currentTime / dur);
+  const barX = 30, barY = GROUND_Y + 24, barW = VW - 60, barH = 8;
+  // 轨道
+  ctx.fillStyle = 'rgba(0,0,0,.28)';
+  roundRect(barX, barY, barW, barH, 4); ctx.fill();
+  // 填充
+  if (p > 0.01){
+    ctx.fillStyle = '#FFC93C';
+    roundRect(barX, barY, Math.max(barH, barW*p), barH, 4); ctx.fill();
+  }
+  // 边框
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5;
+  roundRect(barX, barY, barW, barH, 4); ctx.stroke();
+  // 进度头（小圆点）
+  ctx.fillStyle = '#FFF6E5';
+  ctx.beginPath(); ctx.arc(barX + barW*p, barY + barH/2, 7, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#E08F00'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(barX + barW*p, barY + barH/2, 7, 0, Math.PI*2); ctx.stroke();
+  // 两端标记：起点小旗 + 终点小雪峰图标
+  ctx.fillStyle = 'rgba(43,43,43,.55)';
+  ctx.font = '13px "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('🎵', barX - 22, barY + barH/2);
+  ctx.textAlign = 'right';
+  ctx.fillText('🏔️', barX + barW + 22, barY + barH/2);
+}
+
+// ---------- 绘制：通关字幕 ----------
+function drawWin(){
+  const wt = (performance.now() - winStart)/1000;
+  const mask = Math.min(1, wt/0.8);                       // 遮罩淡入
+  ctx.fillStyle = 'rgba(0,0,0,' + (0.4*mask) + ')';
+  ctx.fillRect(0, 0, VW, VH);
+  const st = Math.min(1, Math.max(0, (wt-0.5)/1.0));      // 0.5s 后字幕上浮淡入
+  if (st > 0){
+    ctx.save();
+    ctx.globalAlpha = st;
+    ctx.textAlign = 'center';
+    // 主字幕
+    ctx.fillStyle = '#FFF6E5';
+    ctx.font = 'bold 34px "Microsoft YaHei", sans-serif';
+    ctx.fillText('恭喜你，你成功到达了雪峰!', VW/2, VH*0.40 - (1-st)*24);
+    // 装饰线
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(VW/2-140, VH*0.40 + 18); ctx.lineTo(VW/2+140, VH*0.40 + 18);
+    ctx.stroke();
+    // 结算信息
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
+    ctx.fillText('得分 ' + Math.floor(score) + '    奶鱼 × ' + fishCount, VW/2, VH*0.40 + 52);
+    ctx.fillStyle = 'rgba(255,255,255,.65)';
+    ctx.font = '15px "Microsoft YaHei", sans-serif';
+    ctx.fillText('最高纪录 ' + best, VW/2, VH*0.40 + 80);
+    ctx.restore();
+  }
+}
+
+// ---------- 主循环 ----------
+function draw(){
+  const t = performance.now()/1000;
+
+  // 临近终点（BGM 剩余 5 秒）：镜头逐渐拉远
+  const remain = isFinite(bgm.duration) ? bgm.duration - bgm.currentTime : 999;
+  const nearing = (state === 'playing') && remain <= 5;
+  if (nearing) zoom = Math.max(0.8, 1 - (5 - Math.max(0,remain))/5 * 0.2);
+
+  // 镜头缩放基底色（拉远时露出的天空，昼夜渐变）
+  ctx.fillStyle = lerpColor(PAL.day.sky, PAL.night.sky, nightMix);
+  ctx.fillRect(0, 0, VW, VH);
+
+  ctx.save();
+  ctx.translate(VW/2, VH/2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-VW/2, -VH/2);
+
+  drawBackground(t);
+  // 雷暴：背景压暗（扩大覆盖，镜头拉远时不露矩形边界）
+  if (stormMix > 0.02){
+    ctx.fillStyle = 'rgba(45,55,80,' + (0.35*stormMix) + ')';
+    ctx.fillRect(-120, -120, VW+240, VH+240);
+  }
+  // 终点雪峰：BGM 剩余 5 秒时出现，2 秒内滑入画面中央偏右
+  if (nearing || state === 'win'){
+    let snowX = VW*0.62;
+    if (nearing){
+      const phase = Math.min(1, Math.max(0, (5 - remain)/2));
+      snowX = VW + 150 + phase * (VW*0.62 - (VW+150));
+    }
+    drawSnowMountain(snowX);
+  }
+  for (const f of fishes) drawFish(f.x, f.y);
+  for (const o of obstacles){
+    if (o.type==='chili') drawChili(o.x, o.y, o.h);
+    else if (o.type==='rock') drawRock(o.x, o.y, o.w, o.h);
+    else if (o.type==='croc') drawCroc(o.x, o.y, t, o.w, o.h);
+    else drawHeli(o.x, o.y, t, o.w, o.h);
+  }
+  // 碎片
+  for (const s of shards){
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+    ctx.globalAlpha = Math.min(1, s.life*2.2);
+    ctx.fillStyle = s.color;
+    ctx.fillRect(-s.size/2, -s.size/2, s.size, s.size);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  // 保命无敌期间奶龙闪烁
+  if (invincible > 0 && state === 'playing' && Math.floor(performance.now()/60)%2===0) ctx.globalAlpha = 0.35;
+  drawDino();
+  ctx.globalAlpha = 1;
+  drawRain(t);          // 雨滴在前景（淋在奶龙身上）
+  drawFog();
+  ctx.restore();
+
+  // 闪电白闪（全屏变白一小会，不覆盖 UI/进度条）
+  if (stormFlash > 0.01){
+    ctx.fillStyle = 'rgba(255,255,255,' + stormFlash + ')';
+    ctx.fillRect(0, 0, VW, VH);
+  }
+
+  // 雾天提示
+  if (fog.hint > 0 && state === 'playing'){
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(255,255,255,' + Math.min(1, fog.hint*1.4) + ')';
+    ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
+    ctx.fillText('🌫️ 起雾了！前方视线受阻！', VW/2, 34);
+  }
+  // 奶鱼护体提示
+  if (shieldHint > 0 && state === 'playing'){
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(255,236,150,' + Math.min(1, shieldHint*1.4) + ')';
+    ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
+    ctx.fillText('🐟 奶鱼护体！障碍已粉碎！', VW/2, 58);
+  }
+  if (state === 'playing'){ drawUI(); drawProgress(); }
+  if (state === 'ready') drawReady();
+  if (state === 'gameover'){ drawUI(); drawGameOver(); }
+  if (state === 'win'){ drawWin(); }
+}
+
+let last = performance.now(), acc = 0;
+function loop(now){
+  requestAnimationFrame(loop);
+  let dt = (now - last)/1000; last = now;
+  if (dt > 0.1) dt = 0.1;
+  acc += dt;
+  while (acc >= 1/60){ update(1/60); acc -= 1/60; }
+  draw();
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
