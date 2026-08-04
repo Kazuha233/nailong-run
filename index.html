@@ -287,7 +287,8 @@ function playHeliSfx(){
 // ===== 背景音乐（BGM：放完 = 到达终点 = 通关） =====
 const bgm = new Audio('assets/bgm.mp3');
 bgm.preload = 'auto';
-bgm.addEventListener('canplay', function(){ markLoaded(); checkPreload(); });   // canplay：能播即就绪，边播边缓冲（加速进度条）
+// canplaythrough：整首下载完才就绪（防边播边下卡顿；BGM 已压 128k/3.1MB，等待可接受）
+bgm.addEventListener('canplaythrough', function(){ markLoaded(); checkPreload(); });
 bgm.addEventListener('error', function(){ markLoaded(); checkPreload(); });
 bgm.addEventListener('ended', function(){
   if (state === 'playing') winGame();
