@@ -68,7 +68,7 @@ let spawnDist = 500;
 
 // ---------- 奶龙 ----------
 const dino = {
-  x: 84, y: GROUND_Y, vy: 0,
+  x: VW/4, y: GROUND_Y, vy: 0,        // 奶龙位于屏幕四分之一处
   mode: 'run',          // run | jump | duck
   onGround: true, animT: 0
 };
@@ -899,7 +899,7 @@ function drawLoading(){
   ctx.fillRect(0, GROUND_Y, VW, VH - GROUND_Y);
   // 奶龙（跑动动画活跃加载氛围）
   dino.animT = performance.now()/1000;
-  dino.x = VW/2 - 44; dino.y = GROUND_Y;
+  dino.x = VW/4; dino.y = GROUND_Y;   // 与游戏内位置一致（四分之一处）
   dino.onGround = true; dino.mode = 'run';
   drawDino();
   // 标题
