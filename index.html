@@ -266,7 +266,7 @@ function markHeliSfxOnce(){ if (!heliSfxMarked){ heliSfxMarked = true; markLoade
 for (let i=0;i<HELI_SFX_POOL_SIZE;i++){
   const a = new Audio('assets/heli_sfx.mp3');
   a.preload = 'auto';
-  a.addEventListener('canplaythrough', markHeliSfxOnce);
+  a.addEventListener('canplay', markHeliSfxOnce);
   a.addEventListener('error', markHeliSfxOnce);
   heliSfxPool.push(a);
 }
@@ -287,7 +287,7 @@ function playHeliSfx(){
 // ===== 背景音乐（BGM：放完 = 到达终点 = 通关） =====
 const bgm = new Audio('assets/bgm.mp3');
 bgm.preload = 'auto';
-bgm.addEventListener('canplaythrough', function(){ markLoaded(); checkPreload(); });
+bgm.addEventListener('canplay', function(){ markLoaded(); checkPreload(); });   // canplay：能播即就绪，边播边缓冲（加速进度条）
 bgm.addEventListener('error', function(){ markLoaded(); checkPreload(); });
 bgm.addEventListener('ended', function(){
   if (state === 'playing') winGame();
@@ -298,7 +298,7 @@ const reviveSfx = new Audio('assets/revive_sfx.mp3');
 reviveSfx.preload = 'auto';
 let reviveSfxMarked = false;
 function markReviveSfxOnce(){ if (!reviveSfxMarked){ reviveSfxMarked = true; markLoaded(); checkPreload(); } }
-reviveSfx.addEventListener('canplaythrough', markReviveSfxOnce);
+reviveSfx.addEventListener('canplay', markReviveSfxOnce);
 reviveSfx.addEventListener('error', markReviveSfxOnce);
 
 // ---------- 生成障碍 / 奶鱼 ----------
