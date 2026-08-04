@@ -20,18 +20,14 @@
   #btnJump { left:22px; }   /* 跳 → 左下 */
   #btnDuck  { right:22px; } /* 蹲 → 右下 */
   @media (pointer:coarse) { .btn { display:flex; } }
-  /* 手机竖屏：显示「请横屏」遮罩（强制横板，锁定横屏模式） */
-  #rotateHint {
-    position:fixed; inset:0; z-index:100; display:none;
-    flex-direction:column; align-items:center; justify-content:center; gap:14px;
-    background:rgba(10,10,22,.88); color:#fff;
-    font-family:"Microsoft YaHei",sans-serif; text-align:center;
+  /* 竖屏视口（含微信内置浏览器默认竖屏渲染）：游戏窗口旋转 90° 横板显示 */
+  body.portrait #stage {
+    width:100vh; height:100vw; top:50%; left:50%;
+    transform:translate(-50%,-50%) rotate(90deg);
   }
-  #rotateHint .icon { font-size:56px; animation:spin 2s linear infinite; }
-  #rotateHint .main { font-size:24px; font-weight:bold; }
-  #rotateHint .sub  { font-size:15px; color:rgba(255,255,255,.65); }
-  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-  body.portrait #rotateHint { display:flex; }
+  /* 旋转后按钮：盒左上=视觉左下（跳），盒左下=视觉右下（蹲） */
+  body.portrait #btnJump { top:22px; left:22px; right:auto; bottom:auto; }
+  body.portrait #btnDuck  { bottom:22px; left:22px; right:auto; top:auto; }
   #btnRestart {
     position:absolute; left:50%; top:84%; transform:translate(-50%,-50%);
     display:none; padding:10px 32px; font-size:18px; font-weight:bold;
@@ -48,11 +44,6 @@
   <button id="btnRestart">🦖 再来一局</button>
   <div class="btn" id="btnJump">跳</div>
   <div class="btn" id="btnDuck">蹲</div>
-</div>
-<div id="rotateHint">
-  <div class="icon">↻</div>
-  <div class="main">请横屏游玩</div>
-  <div class="sub">旋转手机，画面自动切换横版</div>
 </div>
 <script>
 'use strict';
@@ -209,20 +200,24 @@ btnRestart.addEventListener('pointerdown', e => {
   btnRestart.style.display = 'none';
 });
 
-// ---------- 画布自适应（竖屏时显示「请横屏」遮罩，强制横板） ----------
+// ---------- 画布自适应（竖屏视口 → 游戏窗口旋转 90° 横板显示） ----------
 function resize(){
   const dpr = window.devicePixelRatio || 1;
   canvas.width = VW*dpr; canvas.height = VH*dpr;
-  const portrait = window.innerHeight > window.innerWidth;   // 竖屏 → 遮罩提示
+  // 微信内置浏览器默认竖屏渲染（手机横放视口仍竖）→ 检测视口方向旋转内容
+  const portrait = window.innerHeight > window.innerWidth;
   document.body.classList.toggle('portrait', portrait);
-  const r = Math.min(innerWidth/VW, innerHeight/VH);
+  // 竖屏时容器旋转 90°，可用宽=视口高、可用高=视口宽
+  const availW = portrait ? innerHeight : innerWidth;
+  const availH = portrait ? innerWidth  : innerHeight;
+  const r = Math.min(availW/VW, availH/VH);
   canvas.style.width  = (VW*r|0)+'px';
   canvas.style.height = (VH*r|0)+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 window.addEventListener('resize', resize);
 resize();
-// 锁定横屏（安卓 Chrome 生效；iOS Safari 不支持 lock 则依赖遮罩提示手动旋转）
+// 手机浏览器增强：尝试锁定横屏（微信 WebView 内无效但静默失败；其余浏览器竖屏也会自动转横）
 function tryLockLandscape(){
   try {
     if (screen.orientation && screen.orientation.lock){
