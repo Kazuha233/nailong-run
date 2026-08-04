@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>奶龙快跑 🦖</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦖</text></svg>">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="assets/icon-512.png">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; overflow:hidden; background:#101018; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
@@ -1170,6 +1172,11 @@ function loop(now){
   draw();
 }
 requestAnimationFrame(loop);
+
+// ---------- PWA：Service Worker 注册（HTTPS 下离线可玩；file:// 静默失败） ----------
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>
