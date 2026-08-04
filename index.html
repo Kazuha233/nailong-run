@@ -1035,7 +1035,7 @@ function drawProgress(){
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText('🎵', barX - 22, barY + barH/2);
   ctx.textAlign = 'right';
-  ctx.fillText('🏔️', barX + barW + 22, barY + barH/2);
+  ctx.fillText('🏔️', barX + barW + 22, barY - 12);   // 终点标记移到进度条上方，避开右下角署名
 }
 
 // ---------- 绘制：通关字幕 ----------
@@ -1153,6 +1153,12 @@ function draw(){
   if (state === 'ready') drawReady();
   if (state === 'gameover'){ drawUI(); drawGameOver(); }
   if (state === 'win'){ drawWin(); }
+
+  // 右下角署名
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillStyle = 'rgba(43,43,43,.32)';
+  ctx.font = '11px "Microsoft YaHei", sans-serif';
+  ctx.fillText('「随枫」出品', VW - 10, VH - 4);
 }
 
 let last = performance.now(), acc = 0;
