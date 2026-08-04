@@ -9,18 +9,25 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; overflow:hidden; background:#101018; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
   body { display:flex; align-items:center; justify-content:center; }
-  #game { image-rendering:pixelated; }
+  #game { image-rendering:pixelated; width:auto; height:auto; max-width:100%; max-height:100%; aspect-ratio:800/300; }
   .btn {
-    position:fixed; bottom:28px; width:66px; height:66px; border-radius:50%;
+    position:absolute; bottom:28px; width:66px; height:66px; border-radius:50%;
     background:rgba(255,255,255,.16); color:#fff; font-size:24px; font-weight:bold;
     border:2px solid rgba(255,255,255,.32); display:none; align-items:center; justify-content:center;
     z-index:10; user-select:none; -webkit-user-select:none; font-family:"Microsoft YaHei",sans-serif;
   }
   .btn:active { background:rgba(255,255,255,.38); }
-  #btnJump { right:22px; }
-  #btnDuck  { left:22px; }
+  #btnJump { left:22px; }   /* 跳 → 左下 */
+  #btnDuck  { right:22px; } /* 蹲 → 右下 */
   @media (pointer:coarse) { .btn { display:flex; } }
-  #stage { position:relative; display:inline-block; line-height:0; }
+  /* 手机竖屏：整容器旋转 90° 横板显示（自动切换横板） */
+  body.portrait #stage {
+    width:100vh; height:100vw; top:50%; left:50%;
+    transform:translate(-50%,-50%) rotate(90deg);
+  }
+  /* 旋转后按钮落到视觉左/右下角（盒左上=视觉左下，盒左下=视觉右下） */
+  body.portrait #btnJump { top:22px; left:22px; right:auto; bottom:auto; }
+  body.portrait #btnDuck  { bottom:22px; left:22px; right:auto; top:auto; }
   #btnRestart {
     position:absolute; left:50%; top:84%; transform:translate(-50%,-50%);
     display:none; padding:10px 32px; font-size:18px; font-weight:bold;
@@ -35,9 +42,9 @@
 <div id="stage">
   <canvas id="game"></canvas>
   <button id="btnRestart">🦖 再来一局</button>
+  <div class="btn" id="btnJump">跳</div>
+  <div class="btn" id="btnDuck">蹲</div>
 </div>
-<div class="btn" id="btnJump">跳</div>
-<div class="btn" id="btnDuck">蹲</div>
 <script>
 'use strict';
 /* =========================================================
@@ -193,11 +200,16 @@ btnRestart.addEventListener('pointerdown', e => {
   btnRestart.style.display = 'none';
 });
 
-// ---------- 画布自适应 ----------
+// ---------- 画布自适应（方向感知：竖屏旋转横板） ----------
 function resize(){
   const dpr = window.devicePixelRatio || 1;
   canvas.width = VW*dpr; canvas.height = VH*dpr;
-  const r = Math.min(innerWidth/VW, innerHeight/VH);
+  const portrait = window.innerHeight > window.innerWidth;   // 竖屏
+  document.body.classList.toggle('portrait', portrait);      // 触发 CSS 旋转（自动切换横板）
+  // 竖屏时容器旋转 90°，可用宽=屏高、可用高=屏宽
+  const availW = portrait ? innerHeight : innerWidth;
+  const availH = portrait ? innerWidth  : innerHeight;
+  const r = Math.min(availW/VW, availH/VH);
   canvas.style.width  = (VW*r|0)+'px';
   canvas.style.height = (VH*r|0)+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
