@@ -53,7 +53,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 // ---------- 游戏状态 ----------
-let state = 'ready';               // ready | playing | gameover
+let state = 'loading';               // loading | ready | playing | gameover
 let score = 0, fishCount = 0, best = 0;    // 显示分=进度×9999（匀速），初始 0 条奶鱼
 let distScore = 0;                          // 内部距离分（只驱动速度，不显示）
 let speed = 6, groundOffset = 0, night = false;
@@ -156,6 +156,7 @@ const clouds = [ {x:150,y:60,s:.8}, {x:430,y:95,s:1.15}, {x:660,y:48,s:.65} ];
 // ---------- 输入 ----------
 function pressJump(){
   initAudio();
+  if (state === 'loading') return;                 // 资源未就绪，忽略点击
   if (state === 'ready')   { state='playing'; sfx.start(); bgm.currentTime=0; bgm.play().catch(function(){}); return; }
   if (dino.mode === 'duck'){ dino.mode='run'; }    // 蹲着按跳：先站起再跳
   if (dino.onGround){ dino.vy = -10; dino.mode='jump'; dino.onGround=false; sfx.jump(); }
@@ -238,11 +239,23 @@ function spawnShards(o){
   }
 }
 
-// ---------- 直升机吊挂 GIF（帧序列播放，动画保证动起来） ----------
+// ---------- 资源预加载（全部就绪才进入 ready 封面，防止开场卡顿） ----------
 const HELI_FRAMES = 158, HELI_FPS = 11.11;   // 原 GIF 90ms/帧 ≈ 11.1fps
+const TOTAL_RES = HELI_FRAMES + 3;      // 158 帧 + BGM + 直升机音效 + 复活音效
+let loadedRes = 0, preloadDone = false;
+function markLoaded(){ loadedRes++; }
+function checkPreload(){
+  if (preloadDone || loadedRes < TOTAL_RES) return;
+  preloadDone = true;
+  setTimeout(function(){ if (state === 'loading') state = 'ready'; }, 300);
+}
+
+// ---------- 直升机吊挂 GIF（帧序列播放，动画保证动起来） ----------
 const heliFrames = [];
 for (let i=0;i<HELI_FRAMES;i++){
   const img = new Image();
+  img.onload  = function(){ markLoaded(); checkPreload(); };
+  img.onerror = function(){ markLoaded(); checkPreload(); };
   img.src = 'assets/heli/frame_' + String(i).padStart(3,'0') + '.jpg';
   heliFrames.push(img);
 }
@@ -251,9 +264,13 @@ const HELI_W = 63.5;                      // 221/160 = 1.381 比例
 // 直升机出场音效（实例池：多架同时进场时音效可重叠）
 const HELI_SFX_POOL_SIZE = 3;
 const heliSfxPool = [];
+let heliSfxMarked = false;
+function markHeliSfxOnce(){ if (!heliSfxMarked){ heliSfxMarked = true; markLoaded(); checkPreload(); } }
 for (let i=0;i<HELI_SFX_POOL_SIZE;i++){
   const a = new Audio('assets/heli_sfx.mp3');
   a.preload = 'auto';
+  a.addEventListener('canplaythrough', markHeliSfxOnce);
+  a.addEventListener('error', markHeliSfxOnce);
   heliSfxPool.push(a);
 }
 let heliSfxIdx = 0;
@@ -273,6 +290,8 @@ function playHeliSfx(){
 // ===== 背景音乐（BGM：放完 = 到达终点 = 通关） =====
 const bgm = new Audio('assets/bgm.mp3');
 bgm.preload = 'auto';
+bgm.addEventListener('canplaythrough', function(){ markLoaded(); checkPreload(); });
+bgm.addEventListener('error', function(){ markLoaded(); checkPreload(); });
 bgm.addEventListener('ended', function(){
   if (state === 'playing') winGame();
 });
@@ -280,6 +299,10 @@ bgm.addEventListener('ended', function(){
 // ===== 复活音效（奶鱼护体触发时播放） =====
 const reviveSfx = new Audio('assets/revive_sfx.mp3');
 reviveSfx.preload = 'auto';
+let reviveSfxMarked = false;
+function markReviveSfxOnce(){ if (!reviveSfxMarked){ reviveSfxMarked = true; markLoaded(); checkPreload(); } }
+reviveSfx.addEventListener('canplaythrough', markReviveSfxOnce);
+reviveSfx.addEventListener('error', markReviveSfxOnce);
 
 // ---------- 生成障碍 / 奶鱼 ----------
 function spawnObstacle(){
@@ -866,6 +889,36 @@ function drawUI(){
   ctx.fillStyle = 'rgba(43,43,43,.6)';
   ctx.fillText('× ' + fishCount, 36, 62);
 }
+// ---------- 加载界面（资源就绪前显示，就绪后自动进封面） ----------
+function drawLoading(){
+  ctx.fillStyle = '#101018';
+  ctx.fillRect(0, 0, VW, VH);
+  // 地面
+  ctx.fillStyle = '#241f2e';
+  ctx.fillRect(0, GROUND_Y, VW, VH - GROUND_Y);
+  // 奶龙（跑动动画活跃加载氛围）
+  dino.animT = performance.now()/1000;
+  dino.x = VW/2 - 44; dino.y = GROUND_Y;
+  dino.onGround = true; dino.mode = 'run';
+  drawDino();
+  // 标题
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 26px "Microsoft YaHei", sans-serif';
+  ctx.fillText('奶龙快跑 🦖', VW/2, VH*0.26);
+  // 加载进度条（金色，同草坪进度条风格）
+  const p = Math.min(loadedRes / TOTAL_RES, 1);
+  const barW = 260, barX = (VW-barW)/2, barY = VH*0.58;
+  ctx.fillStyle = 'rgba(255,255,255,.14)';
+  ctx.fillRect(barX, barY, barW, 12);
+  ctx.fillStyle = '#ffd54a';
+  ctx.fillRect(barX, barY, barW*p, 12);
+  // 百分比文案
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.font = '14px "Microsoft YaHei", sans-serif';
+  ctx.fillText('正在加载资源… ' + Math.floor(p*100) + '%', VW/2, barY + 36);
+}
+
 function drawReady(){
   ctx.save();
   ctx.textAlign = 'center';
@@ -1073,6 +1126,7 @@ function drawWin(){
 
 // ---------- 主循环 ----------
 function draw(){
+  if (state === 'loading'){ drawLoading(); return; }
   const t = performance.now()/1000;
 
   // 临近终点（BGM 剩余 5 秒）：镜头逐渐拉远
