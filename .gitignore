@@ -4,3 +4,11 @@ build/
 *.spec
 __pycache__/
 *.pyc
+
+# 打包工具链（JDK/build-tools，182MB 不入库）
+tools/
+
+# APK/AAB/签名证书（敏感文件不入库）
+android-package/
+android-package-webview/
+*.zip
