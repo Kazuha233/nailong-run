@@ -241,7 +241,7 @@ function spawnShards(o){
 
 // ---------- 资源预加载（全部就绪才进入 ready 封面，防止开场卡顿） ----------
 const HELI_FRAMES = 158, HELI_FPS = 11.11;   // 原 GIF 90ms/帧 ≈ 11.1fps
-const TOTAL_RES = HELI_FRAMES + 3;      // 158 帧 + BGM + 直升机音效 + 复活音效
+const TOTAL_RES = 4;                    // 直升机雪碧图 + BGM + 直升机音效 + 复活音效
 let loadedRes = 0, preloadDone = false;
 function markLoaded(){ loadedRes++; }
 function checkPreload(){
@@ -250,15 +250,12 @@ function checkPreload(){
   setTimeout(function(){ if (state === 'loading') state = 'ready'; }, 300);
 }
 
-// ---------- 直升机吊挂 GIF（帧序列播放，动画保证动起来） ----------
-const heliFrames = [];
-for (let i=0;i<HELI_FRAMES;i++){
-  const img = new Image();
-  img.onload  = function(){ markLoaded(); checkPreload(); };
-  img.onerror = function(){ markLoaded(); checkPreload(); };
-  img.src = 'assets/heli/frame_' + String(i).padStart(3,'0') + '.jpg';
-  heliFrames.push(img);
-}
+// ---------- 直升机吊挂动画（雪碧图：158 帧合并为 1 张图 1 个请求，11fps 裁剪播放） ----------
+const HELI_SPRITE_COLS = 10, HELI_SPRITE_ROWS = 16;   // 10列×16行 = 160 格
+const heliSprite = new Image();
+heliSprite.onload  = function(){ markLoaded(); checkPreload(); };
+heliSprite.onerror = function(){ markLoaded(); checkPreload(); };
+heliSprite.src = 'assets/heli_sprite.jpg';
 const HELI_H = 46;                        // GIF 显示高度（碰撞基准，蹲下正好躲过）
 const HELI_W = 63.5;                      // 221/160 = 1.381 比例
 // 直升机出场音效（实例池：多架同时进场时音效可重叠）
@@ -771,7 +768,10 @@ function drawHeli(x, y, t, w, h){
   ctx.translate(hookX, hookY);
   ctx.rotate(swing);
   const fi = Math.floor(t*HELI_FPS) % HELI_FRAMES;
-  ctx.drawImage(heliFrames[fi], -w/2, 0, w, h);
+  // 雪碧图裁剪：第 fi 帧 → (列, 行) 坐标
+  const sw = heliSprite.naturalWidth / HELI_SPRITE_COLS;
+  const sh = heliSprite.naturalHeight / HELI_SPRITE_ROWS;
+  ctx.drawImage(heliSprite, (fi % HELI_SPRITE_COLS)*sw, Math.floor(fi/HELI_SPRITE_COLS)*sh, sw, sh, -w/2, 0, w, h);
   ctx.restore();
   // 直升机本体
   drawHeliBody(hx, hy, t);
