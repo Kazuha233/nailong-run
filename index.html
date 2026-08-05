@@ -68,58 +68,58 @@
     z-index:15; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
   }
   #btnSettings:active { background:rgba(255,255,255,.38); }
-  body.portrait #btnSettings { left:3px; top:3px; right:auto; bottom:auto; }  /* 画面左上 → 旋转后视觉右上角 */
+  /* 竖屏设置按钮位置由 resize() JS 计算（贴游戏画布视觉右上角，旋转后随画布） */
   /* 主界面：左侧模式选择 + 右侧极限排行榜 */
   #mainMenu {
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
     display:none; z-index:30;                        /* 尺寸由 resize() 按画布同步（宽80% 高100%，上下与画面齐平） */
     background:rgba(16,16,28,.88); border:2px solid rgba(255,255,255,.18);
-    border-radius:16px; padding:14px 20px;
-    flex-direction:row; gap:14px;
+    border-radius:1.14em; padding:1em 1.43em;
+    flex-direction:row; gap:1em;
     font-family:"Microsoft YaHei",sans-serif;
   }
-  #mmLeft { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; }
-  #mmRight { flex:1; border-left:1px solid rgba(255,255,255,.15); padding-left:14px; display:flex; flex-direction:column; }
-  #mmTitle { color:#FFB020; font-size:26px; font-weight:bold; text-align:center; letter-spacing:6px; margin-bottom:6px; }
-  .mm-title { color:#FFB020; font-size:14px; font-weight:bold; margin-bottom:4px; text-align:center; }
+  #mmLeft { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.86em; }
+  #mmRight { flex:1; border-left:1px solid rgba(255,255,255,.15); padding-left:1em; display:flex; flex-direction:column; }
+  #mmTitle { color:#FFB020; font-size:1.86em; font-weight:bold; text-align:center; letter-spacing:0.23em; margin-bottom:0.23em; }
+  .mm-title { color:#FFB020; font-size:1em; font-weight:bold; margin-bottom:0.29em; text-align:center; }
   .mm-btn {
-    width:150px; padding:9px 0; font-size:14px; font-weight:bold; border:none; border-radius:10px; cursor:pointer;
-    font-family:"Microsoft YaHei",sans-serif; color:#fff; box-shadow:0 3px 0 rgba(0,0,0,.35);
+    width:10.71em; padding:0.64em 0; font-size:1em; font-weight:bold; border:none; border-radius:0.71em; cursor:pointer;
+    font-family:"Microsoft YaHei",sans-serif; color:#fff; box-shadow:0 0.21em 0 rgba(0,0,0,.35);
   }
-  .mm-btn:active { transform:translateY(2px); box-shadow:none; }
+  .mm-btn:active { transform:translateY(0.14em); box-shadow:none; }
   #mmNormal { background:#4CAF50; }
   #mmExtreme { background:#E8590C; }
-  .lb-title { color:#FFB020; font-size:10px; font-weight:bold; text-align:center; margin-bottom:4px; }
-  #lbList { flex:1; overflow-y:auto; overflow-x:hidden; color:#ddd; font-size:8px; line-height:1.9; padding-bottom:30px; }  /* 可滚动；底部留白防右下角成就按钮遮挡 */
-  #lbList::-webkit-scrollbar { width:5px; }
-  #lbList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:3px; }
+  .lb-title { color:#FFB020; font-size:0.71em; font-weight:bold; text-align:center; margin-bottom:0.4em; }
+  #lbList { flex:1; overflow-y:auto; overflow-x:hidden; color:#ddd; font-size:0.57em; line-height:1.9; padding-bottom:3.75em; }  /* 可滚动；底部留白防右下角成就按钮遮挡 */
+  #lbList::-webkit-scrollbar { width:0.625em; }
+  #lbList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:0.375em; }
   #lbList::-webkit-scrollbar-track { background:transparent; }
-  /* 排行榜行（昵称 / 时间 / 分数 三列 + 排名） */
-  .lb-head, .lb-row { display:flex; align-items:center; gap:4px; padding:1px 2px; }
-  .lb-head { color:rgba(255,255,255,.5); margin-bottom:2px; border-bottom:1px solid rgba(255,255,255,.12); }
-  .lb-rank { width:24px; color:#FFB020; font-weight:bold; }
-  .lb-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; position:relative; padding-left:15px; }  /* 预留左侧图标位：昵称文字齐平，图标凸出 */
-  .lb-time { width:54px; text-align:center; color:rgba(255,255,255,.6); }
-  .lb-score { width:32px; text-align:right; color:#FFD54A; font-weight:bold; }
-  .lb-mine { background:rgba(255,176,32,.22); border-radius:4px; }
+  /* 排行榜行（昵称 / 时间 / 分数 三列 + 排名；em 相对 lbList 字号 0.57×base） */
+  .lb-head, .lb-row { display:flex; align-items:center; gap:0.5em; padding:0.125em 0.25em; }
+  .lb-head { color:rgba(255,255,255,.5); margin-bottom:0.25em; border-bottom:1px solid rgba(255,255,255,.12); }
+  .lb-rank { width:3em; color:#FFB020; font-weight:bold; }
+  .lb-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; position:relative; padding-left:1.875em; }  /* 预留左侧图标位：昵称文字齐平，图标凸出 */
+  .lb-time { width:6.75em; text-align:center; color:rgba(255,255,255,.6); }
+  .lb-score { width:4em; text-align:right; color:#FFD54A; font-weight:bold; }
+  .lb-mine { background:rgba(255,176,32,.22); border-radius:0.5em; }
   /* 主菜单左下角：退出登录（父级 mainMenu 隐藏时自动隐藏） */
   #btnLogout {
-    position:absolute; left:6px; bottom:6px;
-    width:22px; height:22px; border-radius:50%;
-    background:rgba(255,255,255,.16); color:#fff; font-size:12px;
-    border:1.5px solid rgba(255,255,255,.32);
+    position:absolute; left:0.5em; bottom:0.5em;
+    width:1.83em; height:1.83em; border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; font-size:0.86em;
+    border:0.125em solid rgba(255,255,255,.32);
     display:flex; align-items:center; justify-content:center;
     z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
   }
   #btnLogout:active { background:rgba(255,255,255,.38); }
   /* 主菜单右下角：成就系统（圆角矩形小按钮：图标 + 文字，小号防挡榜单） */
   #btnAchieve {
-    position:absolute; right:8px; bottom:8px;
-    padding:2px 7px; font-size:10px; font-weight:bold;
+    position:absolute; right:0.8em; bottom:0.8em;
+    padding:0.2em 0.7em; font-size:0.71em; font-weight:bold;
     background:rgba(255,255,255,.16); color:#fff;
-    border:1px solid rgba(255,255,255,.32);
-    border-radius:7px; display:flex; align-items:center; justify-content:center;
-    gap:2px; z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
+    border:0.1em solid rgba(255,255,255,.32);
+    border-radius:0.7em; display:flex; align-items:center; justify-content:center;
+    gap:0.2em; z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
   }
   #btnAchieve:active { background:rgba(255,255,255,.38); }
   /* 成就界面（点右下角 🎖️ 打开：隐藏主菜单、全画布页面、列表可滚动） */
@@ -1043,6 +1043,8 @@ function resize(){
     if (cw > 0 && ch > 0){
       mm.style.width  = Math.round(cw*0.9) + 'px';
       mm.style.height = Math.round(ch) + 'px';
+      // 主菜单整体缩放基准：画布宽 800 → 16px；等比放大字号（限 10~40px 防极端）
+      mm.style.fontSize = Math.max(10, Math.min(40, 16 * cw / 800)) + 'px';
     }
   }
   // 开始界面宽度跟随画布（高度自适应内容）
@@ -1060,7 +1062,7 @@ function resize(){
       ap.style.height = Math.round(ch) + 'px';
     }
   }
-  // 设置按钮：横屏跟随画布右上角（竖屏由 CSS body.portrait 规则处理）
+  // 设置按钮：横屏跟随画布右上角；竖屏由 JS 贴画布视觉右上角（stage 旋转 90°：画面左上 → 视觉右上）
   if (!portrait){
     const cw = parseFloat(canvas.style.width), ch = parseFloat(canvas.style.height);
     if (cw > 0 && ch > 0){
@@ -1070,7 +1072,15 @@ function resize(){
       btnSettings.style.bottom = 'auto';
     }
   } else {
-    btnSettings.style.left = btnSettings.style.top = btnSettings.style.right = btnSettings.style.bottom = '';
+    // 竖屏：stage 本地宽 = 100vh、高 = 100vw；画布垂直居中 → 画布本地左上 = (0, (innerWidth-ch)/2)
+    // 旋转后该点 = 视觉右上角（画布视觉右上角）
+    const cw = parseFloat(canvas.style.width), ch = parseFloat(canvas.style.height);
+    if (cw > 0 && ch > 0){
+      btnSettings.style.left   = '3px';
+      btnSettings.style.top    = Math.round((innerWidth - ch)/2 + 3) + 'px';
+      btnSettings.style.right  = 'auto';
+      btnSettings.style.bottom = 'auto';
+    }
   }
   // 结算按钮：横屏跟随画布底部居中（防画布居中留白时 top:84% 掉出画面）
   if (!portrait){
