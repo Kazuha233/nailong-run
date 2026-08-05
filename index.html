@@ -12,8 +12,13 @@
   html,body { width:100%; height:100%; overflow:hidden; background:#101018; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
   body { display:flex; align-items:center; justify-content:center; }
   #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
-  /* 竖屏（微信内置浏览器视口固定竖屏）→ 游戏旋转 90° 横板全屏显示 */
-  body.portrait #stage { width:100vh; height:100vw; transform:rotate(90deg); }
+  /* 竖屏（微信内置浏览器视口固定竖屏）→ 游戏旋转 90° 横板全屏显示（中心对齐视口） */
+  body.portrait #stage {
+    width:100vh; height:100vw;
+    left:50%; top:50%;
+    margin-left:-50vh; margin-top:-50vw;   /* 盒子中心 = 视口中心，旋转后正好铺满 */
+    transform:rotate(90deg);
+  }
   body.portrait #btnJump { top:22px; right:22px; left:auto; bottom:auto; }   /* 旋转后视觉右下（跳） */
   body.portrait #btnDuck  { bottom:22px; right:22px; left:auto; top:auto; }  /* 旋转后视觉左下（蹲） */
   #game { image-rendering:pixelated; width:auto; height:auto; max-width:100%; max-height:100%; aspect-ratio:800/300; }
