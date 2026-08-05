@@ -21,7 +21,7 @@
   }
   body.portrait #btnJump { right:22px; bottom:28px; left:auto; top:auto; }   /* 跟随画面：画面右下 → 旋转后视觉左下 */
   body.portrait #btnDuck  { left:22px; bottom:28px; right:auto; top:auto; }  /* 跟随画面：画面左下 → 旋转后视觉左上 */
-  #game { image-rendering:pixelated; width:auto; height:auto; max-width:100%; max-height:100%; aspect-ratio:800/300; }
+  #game { image-rendering:pixelated; width:auto; height:auto; max-width:100%; max-height:100%; aspect-ratio:800/340; }
   .btn {
     position:absolute; bottom:28px; width:66px; height:66px; border-radius:50%;
     background:rgba(255,255,255,.16); color:#fff; font-size:24px; font-weight:bold;
@@ -40,12 +40,275 @@
     box-shadow:0 4px 0 #E08F00; z-index:20;
   }
   #btnRestart:active { transform:translate(-50%,-50%) translateY(3px); box-shadow:0 1px 0 #E08F00; }
+  /* 设置（暂停）面板：统一居中面板，内部标题 + 三按钮竖排 */
+  #pausePanel {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:none; flex-direction:column; align-items:center; gap:8px;
+    background:rgba(16,16,28,.88); border:2px solid rgba(255,255,255,.18);
+    border-radius:14px; padding:14px 26px; z-index:25;
+    font-family:"Microsoft YaHei",sans-serif;
+  }
+  #pausePanel.show { display:flex; }
+  #ppTitle { color:#fff; font-size:18px; font-weight:bold; margin-bottom:4px; }
+  .pp-btn {
+    width:140px; padding:8px 0; font-size:14px; font-weight:bold;
+    border:none; border-radius:9px; cursor:pointer; color:#fff;
+    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 3px 0 rgba(0,0,0,.35);
+  }
+  .pp-btn:active { transform:translateY(2px); box-shadow:none; }
+  #ppResume { background:#4CAF50; }
+  #ppRestart { background:#FFB020; color:#5B3A00; }
+  #ppMenu { background:#2196F3; }
+  /* 设置按钮（右上角）：点击暂停，可继续/重新开始 */
+  #btnSettings {
+    position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; font-size:14px;
+    border:1.5px solid rgba(255,255,255,.32); display:none; align-items:center; justify-content:center;
+    padding-bottom:6px;   /* ⚙️ 小字往上挪半行（emoji 视觉偏下补偿） */
+    z-index:15; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
+  }
+  #btnSettings:active { background:rgba(255,255,255,.38); }
+  body.portrait #btnSettings { left:3px; bottom:3px; right:auto; top:auto; }  /* 旋转后视觉右上角 */
+  /* 主界面：左侧模式选择 + 右侧极限排行榜 */
+  #mainMenu {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:none; z-index:30;                        /* 尺寸由 resize() 按画布同步（宽80% 高100%，上下与画面齐平） */
+    background:rgba(16,16,28,.88); border:2px solid rgba(255,255,255,.18);
+    border-radius:16px; padding:14px 20px;
+    flex-direction:row; gap:14px;
+    font-family:"Microsoft YaHei",sans-serif;
+  }
+  #mmLeft { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; }
+  #mmRight { flex:1; border-left:1px solid rgba(255,255,255,.15); padding-left:14px; display:flex; flex-direction:column; }
+  #mmTitle { color:#FFB020; font-size:26px; font-weight:bold; text-align:center; letter-spacing:6px; margin-bottom:6px; }
+  .mm-title { color:#FFB020; font-size:14px; font-weight:bold; margin-bottom:4px; text-align:center; }
+  .mm-btn {
+    width:150px; padding:9px 0; font-size:14px; font-weight:bold; border:none; border-radius:10px; cursor:pointer;
+    font-family:"Microsoft YaHei",sans-serif; color:#fff; box-shadow:0 3px 0 rgba(0,0,0,.35);
+  }
+  .mm-btn:active { transform:translateY(2px); box-shadow:none; }
+  #mmNormal { background:#4CAF50; }
+  #mmExtreme { background:#E8590C; }
+  .lb-title { color:#FFB020; font-size:10px; font-weight:bold; text-align:center; margin-bottom:4px; }
+  #lbList { flex:1; overflow-y:auto; overflow-x:hidden; color:#ddd; font-size:8px; line-height:1.9; padding-bottom:30px; }  /* 可滚动；底部留白防右下角成就按钮遮挡 */
+  #lbList::-webkit-scrollbar { width:5px; }
+  #lbList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:3px; }
+  #lbList::-webkit-scrollbar-track { background:transparent; }
+  /* 排行榜行（昵称 / 时间 / 分数 三列 + 排名） */
+  .lb-head, .lb-row { display:flex; align-items:center; gap:4px; padding:1px 2px; }
+  .lb-head { color:rgba(255,255,255,.5); margin-bottom:2px; border-bottom:1px solid rgba(255,255,255,.12); }
+  .lb-rank { width:24px; color:#FFB020; font-weight:bold; }
+  .lb-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; position:relative; padding-left:15px; }  /* 预留左侧图标位：昵称文字齐平，图标凸出 */
+  .lb-time { width:54px; text-align:center; color:rgba(255,255,255,.6); }
+  .lb-score { width:32px; text-align:right; color:#FFD54A; font-weight:bold; }
+  .lb-mine { background:rgba(255,176,32,.22); border-radius:4px; }
+  /* 主菜单左下角：退出登录（父级 mainMenu 隐藏时自动隐藏） */
+  #btnLogout {
+    position:absolute; left:6px; bottom:6px;
+    width:22px; height:22px; border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; font-size:12px;
+    border:1.5px solid rgba(255,255,255,.32);
+    display:flex; align-items:center; justify-content:center;
+    z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
+  }
+  #btnLogout:active { background:rgba(255,255,255,.38); }
+  /* 主菜单右下角：成就系统（圆角矩形小按钮：图标 + 文字，小号防挡榜单） */
+  #btnAchieve {
+    position:absolute; right:8px; bottom:8px;
+    padding:2px 7px; font-size:10px; font-weight:bold;
+    background:rgba(255,255,255,.16); color:#fff;
+    border:1px solid rgba(255,255,255,.32);
+    border-radius:7px; display:flex; align-items:center; justify-content:center;
+    gap:2px; z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
+  }
+  #btnAchieve:active { background:rgba(255,255,255,.38); }
+  /* 成就界面（点右下角 🎖️ 打开：隐藏主菜单、全画布页面、列表可滚动） */
+  #achievePanel {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:none; flex-direction:column; align-items:center; gap:10px;
+    background:rgba(16,16,28,.92); border:2px solid rgba(255,255,255,.18);
+    border-radius:16px; padding:12px 18px; z-index:36;      /* 尺寸由 resize() 跟随画布 */
+    font-family:"Microsoft YaHei",sans-serif;
+  }
+  #achievePanel.show { display:flex; }
+  #acTitle { color:#FFB020; font-size:14px; font-weight:bold; margin-top:-4px; }  /* 缩小并上移 */
+  #acList {
+    flex:1; width:100%; overflow-y:auto; overflow-x:hidden;
+    display:flex; flex-direction:column; gap:6px; padding-right:6px;
+  }
+  #acList::-webkit-scrollbar { width:5px; }
+  #acList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:3px; }
+  #acList::-webkit-scrollbar-track { background:transparent; }
+  .ac-item {
+    display:flex; align-items:center; gap:8px; font-size:11px; color:#fff;
+    background:rgba(255,255,255,.06); border-radius:8px; padding:6px 10px;
+  }
+  .ac-equip {
+    min-width:40px; padding:2px 6px; font-size:9px; font-weight:bold;
+    border:none; border-radius:6px; cursor:pointer; color:#fff;
+    background:rgba(255,255,255,.16); font-family:"Microsoft YaHei",sans-serif;
+  }
+  .ac-equip:active { background:rgba(255,255,255,.3); }
+  .ac-equip.on { background:#FFB020; color:#5B3A00; }
+  .ac-equip-ph { min-width:40px; }   /* 未解锁时占位，保持对齐 */
+  .ac-icon { font-size:16px; }
+  .ac-name { font-weight:bold; white-space:nowrap; }
+  .ac-desc { color:rgba(255,255,255,.6); font-size:10px; white-space:nowrap; }
+  .ac-state { margin-left:auto; font-size:10px; white-space:nowrap; }
+  .ac-locked { opacity:.45; }
+  .lb-equip { position:absolute; left:0; top:50%; transform:translateY(-50%); }  /* 图标凸出在昵称左侧，不占昵称文本位 */
+  /* 成就解锁通知（游戏画面上方滑入滑出） */
+  #achNotify {
+    position:absolute; top:10px; left:50%; transform:translateX(-50%) translateY(-90px);
+    display:flex; align-items:center; gap:8px;
+    background:rgba(16,16,28,.92); border:2px solid rgba(255,176,32,.6);
+    border-radius:12px; padding:10px 18px; z-index:40;
+    opacity:0; transition:transform .35s ease, opacity .35s ease;
+    font-family:"Microsoft YaHei",sans-serif; pointer-events:none;
+  }
+  #achNotify.show { transform:translateX(-50%) translateY(0); opacity:1; }
+  .an-icon { font-size:22px; }
+  .an-text { color:#FFD54A; font-size:14px; font-weight:bold; white-space:nowrap; }
+  /* 成就界面右上角关闭 × */
+  #acClose {
+    position:absolute; right:8px; top:8px;
+    width:26px; height:26px; border-radius:50%;
+    border:1px solid rgba(255,255,255,.32);
+    background:rgba(255,255,255,.12); color:#fff; font-size:14px;
+    cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #acClose:active { background:rgba(255,255,255,.3); }
+  /* 退出登录确认弹窗（点左下角 🚪 后弹出） */
+  #confirmPanel {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:none; flex-direction:column; align-items:center; gap:12px;
+    background:rgba(16,16,28,.92); border:2px solid rgba(255,255,255,.18);
+    border-radius:14px; padding:16px 24px; z-index:36;
+    font-family:"Microsoft YaHei",sans-serif;
+  }
+  #confirmPanel.show { display:flex; }
+  #cfTitle { color:#fff; font-size:15px; font-weight:bold; }
+  #cfBtns { display:flex; gap:12px; }
+  .cf-btn {
+    width:96px; padding:8px 0; font-size:14px; font-weight:bold;
+    border:none; border-radius:9px; cursor:pointer; color:#fff;
+    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 3px 0 rgba(0,0,0,.35);
+  }
+  .cf-btn:active { transform:translateY(2px); box-shadow:none; }
+  #cfYes { background:#E8590C; }
+  #cfNo  { background:rgba(255,255,255,.18); }
+  /* 开始界面（注册/登录）：在主菜单之前，游戏画布风格 */
+  #authMenu {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:none; flex-direction:column; align-items:center; z-index:35;
+    background:rgba(16,16,28,.9); border:2px solid rgba(255,255,255,.2);
+    border-radius:18px; padding:24px 32px;
+    font-family:"Microsoft YaHei",sans-serif;
+  }
+  #authHero { display:flex; flex-direction:column; align-items:center; }
+  #authTitle { color:#FFB020; font-size:34px; font-weight:bold; letter-spacing:10px; text-shadow:0 3px 0 rgba(0,0,0,.45); }
+  #authSub { color:#bbb; font-size:13px; margin:10px 0 22px; letter-spacing:1px; }
+  #authBtns { display:flex; gap:16px; }
+  .auth-btn {
+    min-width:118px; padding:11px 0; font-size:16px; font-weight:bold;
+    border:none; border-radius:11px; cursor:pointer; color:#fff;
+    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 4px 0 rgba(0,0,0,.35);
+  }
+  .auth-btn:active { transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.35); }
+  #btnRegister { background:#4CAF50; }
+  #btnLogin   { background:#2196F3; }
+  #authForm { display:none; flex-direction:column; align-items:center; gap:10px; width:250px; }
+  #authForm.show { display:flex; }
+  #afTitle { color:#FFB020; font-size:18px; font-weight:bold; margin-bottom:2px; }
+  #authForm input {
+    width:100%; padding:9px 12px; font-size:14px; border-radius:9px; color:#fff;
+    border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08);
+    outline:none; font-family:"Microsoft YaHei",sans-serif;
+  }
+  #authForm input::placeholder { color:rgba(255,255,255,.4); }
+  #authForm input:focus { border-color:#FFB020; }
+  #afMsg { min-height:15px; font-size:12px; color:#FF8A80; text-align:center; }
+  #afMsg.ok { color:#81C784; }
+  #afBtns { display:flex; gap:12px; margin-top:2px; }
+  .auth-btn-sm {
+    width:96px; padding:8px 0; font-size:14px; font-weight:bold;
+    border:none; border-radius:9px; cursor:pointer; color:#fff;
+    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 3px 0 rgba(0,0,0,.35);
+  }
+  .auth-btn-sm:active { transform:translateY(2px); box-shadow:none; }
+  #afSubmit { background:#FFB020; color:#5B3A00; }
+  #afBack { background:rgba(255,255,255,.18); }
 </style>
 </head>
 <body>
 <div id="stage">
   <canvas id="game"></canvas>
+  <button id="btnSettings">⚙️</button>
   <button id="btnRestart">🦖 再来一局</button>
+  <!-- 设置（暂停）面板：标题 + 三按钮统一竖排 -->
+  <div id="pausePanel">
+    <div id="ppTitle">⏸️ 已暂停</div>
+    <button id="ppResume" class="pp-btn">▶️ 继续</button>
+    <button id="ppRestart" class="pp-btn">🦖 再来一局</button>
+    <button id="ppMenu" class="pp-btn">🏠 主菜单</button>
+  </div>
+  <!-- 主界面：左栏（标题+模式选择） + 右栏（极限排行榜独占） -->
+  <!-- 开始界面（注册/登录）：在主菜单之前 -->
+  <div id="authMenu">
+    <div id="authHero">
+      <div id="authTitle">奶龙快跑</div>
+      <div id="authSub">登录后开启冒险之旅</div>
+      <div id="authBtns">
+        <button id="btnRegister" class="auth-btn">注册</button>
+        <button id="btnLogin" class="auth-btn">登录</button>
+      </div>
+    </div>
+    <div id="authForm">
+      <div id="afTitle">📝 注册</div>
+      <input id="afNick" maxlength="12" autocomplete="off" placeholder="昵称（1~12 字）">
+      <input id="afPwd" type="password" maxlength="32" autocomplete="off" placeholder="密码（6~32 位）">
+      <input id="afPwd2" type="password" maxlength="32" autocomplete="off" placeholder="确认密码">
+      <div id="afMsg"></div>
+      <div id="afBtns">
+        <button id="afSubmit" class="auth-btn-sm">确认</button>
+        <button id="afBack" class="auth-btn-sm">返回</button>
+      </div>
+    </div>
+  </div>
+  <div id="mainMenu">
+    <div id="mmLeft">
+      <div id="mmTitle">奶龙快跑</div>
+      <div class="mm-title">🎮 选择模式</div>
+      <button id="mmNormal" class="mm-btn">🦖 普通模式</button>
+      <button id="mmExtreme" class="mm-btn">🔥 极限模式</button>
+    </div>
+    <div id="mmRight">
+      <div class="lb-title">🏆 极限排行榜</div>
+      <div id="lbList">⏳ 接入中…</div>
+    </div>
+    <button id="btnLogout" title="退出登录">🚪</button>
+    <button id="btnAchieve" title="成就系统">🎖️ 成就</button>
+  </div>
+  <!-- 成就系统面板 -->
+  <div id="achievePanel">
+    <div id="acTitle">🎖️ 成就系统</div>
+    <button id="acClose" title="返回主菜单">✕</button>
+    <div id="acList"></div>
+  </div>
+  <!-- 成就解锁通知 -->
+  <div id="achNotify">
+    <span class="an-icon"></span>
+    <span class="an-text"></span>
+  </div>
+  <!-- 退出登录确认弹窗 -->
+  <div id="confirmPanel">
+    <div id="cfTitle">确认退出登录吗？</div>
+    <div id="cfBtns">
+      <button id="cfYes" class="cf-btn">确认退出</button>
+      <button id="cfNo" class="cf-btn">取消</button>
+    </div>
+  </div>
   <div class="btn" id="btnJump">跳</div>
   <div class="btn" id="btnDuck">蹲</div>
 </div>
@@ -57,23 +320,47 @@
  * ========================================================= */
 
 // ---------- 基础常量 ----------
-const VW = 800, VH = 300;          // 逻辑分辨率
+const VW = 800, VH = 340;          // 逻辑分辨率（高度加高，主界面/天空更舒展）
 const GROUND_Y = 260;              // 地面 Y
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 // ---------- 游戏状态 ----------
 let state = 'loading';               // loading | ready | playing | gameover
-let score = 0, fishCount = 0, best = 0;    // 显示分=进度×9999（匀速），初始 0 条奶鱼
+let mode = 'normal';                 // normal 普通模式 | extreme 极限模式
+let score = 0, fishCount = 10, best = 0;    // 显示分=进度×9999（匀速）；初始 10 条奶鱼
 let distScore = 0;                          // 内部距离分（只驱动速度，不显示）
 let speed = 6, groundOffset = 0, night = false;
 let nightMix = 0;                      // 昼夜过渡值（0=白天，1=夜晚，平滑渐变）
+let hudLightMix = 0;                   // HUD 文字亮色过渡（0=深灰，1=白；非雾天黑天时渐变白）
 let stormMix = 0;                      // 雷暴强度（BGM 过半后事件式来临）
 let stormFlash = 0;                    // 闪电白闪强度
 let stormTimer = 6;                    // 下次闪电倒计时（秒）
 let stormActive = false;               // 雷暴进行中
 let stormNext = 12;                    // 下次雷暴倒计时（秒）
 let stormDur = 0;                      // 本次雷暴剩余时间（秒）
+let snowMix = 0;                       // 雪天强度（平滑渐变）
+let snowActive = false;                // 雪天进行中
+let snowNext = 25;                     // 下次雪天倒计时（秒）
+let snowDur = 0;                       // 本次雪天剩余时间（秒）
+let snowHint = 0;                      // 下雪提示倒计时
+let snowDepth = 0;                     // 积雪深度（雪下了一会儿才开始积，0~1）
+let snowElapsed = 0;                   // 本次雪天已持续秒数
+let jumpQueued = false, jumpDelay = 0; // 雪天地滑：起跳延迟
+let thornLevel = 0;                    // 荆棘缠身层数（0~3，每撞一次 +1，每层减速递增）
+let thornClears = 0;                   // 已点蹲次数（每满 2 次去掉一层）
+let thornHint = 0;                     // 荆棘提示倒计时
+const THORN_CLEAR_NEED = 2;            // 每层需连续点击下蹲 2 次去除
+const snowParticles = [];              // 雪粒子（飘雪）
+for (let i=0;i<60;i++){
+  snowParticles.push({
+    x: Math.random()*800, y: Math.random()*300,
+    r: 1 + Math.random()*2,            // 雪花半径 1~3
+    vy: 0.6 + Math.random()*1.2,       // 下落速度
+    vx: 0.3 + Math.random()*0.6,       // 水平飘移
+    ph: Math.random()*Math.PI*2        // 摆动相位
+  });
+}
 let spawnDist = 500;
 
 // ---------- 奶龙 ----------
@@ -166,21 +453,37 @@ const clouds = [ {x:150,y:60,s:.8}, {x:430,y:95,s:1.15}, {x:660,y:48,s:.65} ];
 // ---------- 输入 ----------
 function pressJump(){
   initAudio();
-  if (state === 'loading') return;                 // 资源未就绪，忽略点击
-  if (state === 'ready')   { state='playing'; sfx.start(); bgm.currentTime=0; bgm.play().catch(function(){}); return; }
+  if (state === 'loading' || state === 'paused') return;   // 资源未就绪 / 暂停中，忽略点击
+  if (state === 'ready')   { if (document.getElementById('authMenu').style.display === 'flex') return; reset(); startGame(); return; }
   if (dino.mode === 'duck'){ dino.mode='run'; }    // 蹲着按跳：先站起再跳
-  if (dino.onGround){ dino.vy = -10; dino.mode='jump'; dino.onGround=false; sfx.jump(); }
+  if (thornLevel > 0) return;                       // 荆棘缠身：无法跳跃
+  if (dino.onGround){
+    if (snowMix > 0.3){                       // 雪天地滑：起跳延迟一小会
+      jumpQueued = true; jumpDelay = 0.1;
+    } else {
+      dino.vy = -10; dino.mode='jump'; dino.onGround=false; sfx.jump();
+    }
+  }
 }
 function pressDuck(){
   initAudio();
   if (state !== 'playing') return;
-  if (dino.onGround) dino.mode = 'duck';       // 按住 = 蹲下
+  if (thornLevel > 0){                        // 荆棘缠身：连续点击下蹲挣脱（每 3 次去掉一层）
+    thornClears++;
+    if (thornClears >= THORN_CLEAR_NEED){
+      thornClears = 0;
+      thornLevel--;                           // 去掉一层（层数递减，覆盖减少）
+      sfx.fish();
+    }
+  }
+  if (dino.onGround) dino.mode = 'duck';     // 按住 = 蹲下
 }
 function releaseDuck(){
   if (dino.mode === 'duck') dino.mode = 'run'; // 松手 = 站起
 }
 window.addEventListener('keydown', e => {
   if (e.repeat) return;
+  if (e.target && e.target.tagName === 'INPUT') return;   // 输入框聚焦：游戏键不抢输入
   if (e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW'){ e.preventDefault(); pressJump(); }
   else if (e.code==='ArrowDown'||e.code==='KeyS'){ e.preventDefault(); pressDuck(); }
 });
@@ -200,9 +503,524 @@ const btnRestart = document.getElementById('btnRestart');
 btnRestart.addEventListener('pointerdown', e => {
   e.stopPropagation(); e.preventDefault();
   initAudio();
-  reset(); state='playing'; sfx.start();
-  bgm.currentTime = 0; bgm.play().catch(function(){});
+  reset(); startGame();
   btnRestart.style.display = 'none';
+  btnSettings.style.display = 'flex';
+});
+
+// ---------- 开始游戏（统一入口） ----------
+function startGame(){
+  state = 'playing'; sfx.start();
+  bgm.currentTime = 0; bgm.play().catch(function(){});
+  btnSettings.style.display = 'flex';
+  document.getElementById('mainMenu').style.display = 'none';
+}
+// ============ 开始界面（注册 / 登录，Supabase） ============
+const SUPABASE_URL = 'https://stvofpguczogdaxmtqff.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Rrs0qFMaES2wS5Ec2Cbe8g_EmwtImcQ';
+const authMenu = document.getElementById('authMenu');
+const authHero = document.getElementById('authHero');
+const authForm = document.getElementById('authForm');
+const afTitle = document.getElementById('afTitle');
+const afNick = document.getElementById('afNick');
+const afPwd  = document.getElementById('afPwd');
+const afPwd2 = document.getElementById('afPwd2');
+const afMsg  = document.getElementById('afMsg');
+let authMode = 'register';                 // register | login
+let submitting = false;
+
+// SHA-256 纯 JS 实现（file:// 下 crypto.subtle 不可用，内置以支持本地预览）
+function sha256(ascii){
+  function rightRotate(value, amount){ return (value >>> amount) | (value << (32 - amount)); }
+  const maxWord = Math.pow(2, 32);
+  let result = '';
+  const words = [];
+  const asciiBitLength = ascii.length * 8;
+  var hash = sha256.h = sha256.h || [];
+  var k = sha256.k = sha256.k || [];
+  let primeCounter = k.length;
+  const isComposite = {};
+  for (let candidate = 2; primeCounter < 64; candidate++){
+    if (!isComposite[candidate]){
+      for (let i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+      hash[primeCounter] = (Math.pow(candidate, 0.5) * maxWord) | 0;
+      k[primeCounter++] = (Math.pow(candidate, 1/3) * maxWord) | 0;
+    }
+  }
+  ascii += '\x80';
+  while (ascii.length % 64 - 56) ascii += '\x00';
+  for (let i = 0; i < ascii.length; i++){
+    const j = ascii.charCodeAt(i);
+    if (j >> 8) return '';   // 非 ASCII 需先 toUtf8Bytes
+    words[i >> 2] |= j << ((3 - i) % 4) * 8;
+  }
+  words[words.length] = ((asciiBitLength / maxWord) | 0);
+  words[words.length] = (asciiBitLength);
+  for (let j = 0; j < words.length;){
+    const w = words.slice(j, j += 16);
+    const oldHash = hash;
+    hash = hash.slice(0, 8);
+    for (let i = 0; i < 64; i++){
+      const w15 = w[i - 15], w2 = w[i - 2];
+      let a = hash[0], e = hash[4];
+      const temp1 = hash[7]
+        + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25))
+        + ((e & hash[5]) ^ ((~e) & hash[6]))
+        + k[i]
+        + (w[i] = (i < 16) ? w[i] : (
+            w[i - 16]
+            + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3))
+            + w[i - 7]
+            + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))
+          ) | 0);
+      const temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22))
+        + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+      hash = [(temp1 + temp2) | 0].concat(hash);
+      hash[4] = (hash[4] + temp1) | 0;
+    }
+    for (let i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+  }
+  for (let i = 0; i < 8; i++){
+    for (let j = 3; j + 1; j--){
+      const b = (hash[i] >> (j * 8)) & 255;
+      result += ((b < 16) ? 0 : '') + b.toString(16);
+    }
+  }
+  return result;
+}
+// UTF-8 → 单字节字符串（每字符一字节），供 sha256 处理中文密码
+function toUtf8Bytes(str){
+  return encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(m, p){ return String.fromCharCode(parseInt(p, 16)); });
+}
+function hashPassword(pwd){ return sha256(toUtf8Bytes(pwd)); }
+
+// 登录态持久化（localStorage；hash 为密码哈希，用于自动登录判定）
+let loggedUser = null;
+try {
+  const s = localStorage.getItem('nlUser');
+  if (s) loggedUser = JSON.parse(s);
+} catch(e){}
+function saveLogin(nick, hash){
+  loggedUser = { nick: nick, hash: hash };
+  try { localStorage.setItem('nlUser', JSON.stringify(loggedUser)); } catch(e){}
+}
+
+// Supabase REST（Publishable key 为公开 key，可放前端）
+function supabaseFetch(path, options){
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json'
+  };
+  if (options && options.headers){
+    for (const k in options.headers) headers[k] = options.headers[k];
+  }
+  const opts = Object.assign({}, options);
+  opts.headers = headers;
+  return fetch(SUPABASE_URL + '/rest/v1/' + path, opts);
+}
+function showAfMsg(text, ok){
+  afMsg.textContent = text || '';
+  afMsg.className = ok ? 'ok' : '';
+}
+// 开始界面（未登录） / 主菜单（已登录）
+function showStartUI(){
+  if (loggedUser){
+    document.getElementById('mainMenu').style.display = 'flex';
+    loadBoard();
+    syncAchFromServer();
+  } else {
+    authMenu.style.display = 'flex';
+  }
+}
+function openAuthForm(mode){
+  authMode = mode;
+  afTitle.textContent = (mode === 'register') ? '📝 注册' : '🔑 登录';
+  afPwd2.style.display = (mode === 'register') ? '' : 'none';
+  afMsg.textContent = ''; afMsg.className = '';
+  afNick.value = ''; afPwd.value = ''; afPwd2.value = '';
+  authHero.style.display = 'none';
+  authForm.classList.add('show');
+  afNick.focus();
+}
+function closeAuthForm(){
+  authForm.classList.remove('show');
+  authHero.style.display = '';
+  afMsg.textContent = ''; afMsg.className = '';
+}
+function enterMainMenu(){
+  authMenu.style.display = 'none';
+  document.getElementById('mainMenu').style.display = 'flex';
+  loadBoard();
+  syncAchFromServer();
+}
+// 退出登录：确认弹窗 → 清除登录态回开始界面
+function doLogout(){
+  try { localStorage.removeItem('nlUser'); } catch(e){}
+  loggedUser = null;
+  document.getElementById('mainMenu').style.display = 'none';
+  authMenu.style.display = 'flex';
+}
+document.getElementById('btnLogout').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  document.getElementById('confirmPanel').classList.add('show');
+});
+// ============ 成就系统（基于本地最高分自动解锁） ============
+const ACHIEVEMENTS = [
+  { key:'summit',     icon:'🏔️', name:'抵达雪峰', desc:'任意模式到达终点',                need: v => v >= 9999 },
+  { key:'extremeWin', icon:'👑', name:'极限雪峰', desc:'极限模式下到达终点',                check: a => a.extremeWin },
+  { key:'fish6',      icon:'🐟', name:'年年有鱼', desc:'任意模式抵达终点时剩余奶鱼达 6 个', check: a => a.fish6 },
+  { key:'heliMan',    icon:'🚁', name:'Man！',   desc:'一局中靠奶鱼护体撞碎 8 架直升机',  check: a => a.heliMan },
+  { key:'crocHit',    icon:'🐊', name:'鳄啊~',   desc:'一局中撞击 3 次鳄鱼',              check: a => a.crocHit },
+  { key:'snowWalker', icon:'❄️', name:'雪地行者', desc:'不消耗奶鱼在一次雪天中存活',      check: a => a.snowWalker },
+  { key:'thornWalker', icon:'🌵', name:'荆棘行者', desc:'身上缠绕荆棘时连续前进 2500 分',  check: a => a.thornWalker },
+  { key:'unique',     icon:'💎', name:'举世无双', desc:'完成以上所有成就',                 check: a => a.unique }
+];
+let heliBreakCount = 0;                 // 单局护体撞碎直升机计数（🚁 Man！成就）
+let crocHitCount = 0;                   // 单局撞击鳄鱼计数（🐊 鳄啊~成就）
+let snowFishUsed = false;               // 本次雪天是否消耗过奶鱼（❄️ 雪地行者成就）
+let thornScore = 0, thornScoreBase = 0; // 荆棘缠身期间连续前进分数（🌵 荆棘行者成就）
+// 聚合成就判定：除 💎 自身外全部成就达成（summit 看最高分或解锁标志，其余看解锁标志）
+function allAchievementsDone(ach){
+  return (best >= 9999 || !!ach.summit) && ach.extremeWin && ach.fish6 && ach.heliMan && ach.crocHit && ach.snowWalker && ach.thornWalker;
+}
+// ---- 佩戴系统：单成就佩戴，图标显示在排行榜昵称前 ----
+function loadEquip(){ try { return localStorage.getItem('nlEquip') || null; } catch(e){ return null; } }
+function saveEquip(k){
+  try {
+    if (k) localStorage.setItem('nlEquip', k);
+    else localStorage.removeItem('nlEquip');
+    localStorage.setItem('nlEquipSet', '1');      // 本地佩戴操作标记（区分「从未设置」vs「已操作」）
+  } catch(e){}
+}
+function hasLocalEquip(){ try { return !!localStorage.getItem('nlEquipSet'); } catch(e){ return false; } }
+function equipIcon(key){
+  if (!key) return '';
+  const a = ACHIEVEMENTS.find(x => x.key === key);
+  return a ? a.icon : '';
+}
+async function syncEquip(key){          // 佩戴状态同步服务器（RPC update_equip）
+  if (!loggedUser) return;
+  try {
+    await supabaseFetch('rpc/update_equip', {
+      method: 'POST',
+      body: JSON.stringify({ p_nickname: loggedUser.nick, p_equip: key || null })
+    });
+  } catch(e){}
+}
+let achSyncChain = Promise.resolve();          // 同步串行链：多成就连发不乱序
+function syncAchievements(ach){                // 成就解锁状态同步服务器（RPC sync_achievements）
+  if (!loggedUser) return;
+  const body = JSON.stringify({ p_nickname: loggedUser.nick, p_ach: ach || {} });
+  achSyncChain = achSyncChain.then(function(){
+    return supabaseFetch('rpc/sync_achievements', { method: 'POST', body: body });
+  }).catch(function(){});
+}
+function loadAch(){
+  try { return JSON.parse(localStorage.getItem('nlAch')) || {}; } catch(e){ return {}; }
+}
+function saveAch(a){
+  try { localStorage.setItem('nlAch', JSON.stringify(a)); } catch(e){}
+  syncAchievements(a);                   // 解锁变更即同步服务器（账号绑定，跨设备一致）
+}
+// 登录时从服务器拉取成就并合并（取并集：本地 ∪ 服务器，离线解锁的也会补传）
+async function syncAchFromServer(){
+  if (!loggedUser) return;
+  try {
+    const res = await supabaseFetch('users?select=achievements&nickname=eq.' + encodeURIComponent(loggedUser.nick));
+    if (!res.ok) return;
+    const data = await res.json();
+    const serverAch = (data && data[0] && data[0].achievements) || {};
+    const merged = Object.assign({}, serverAch, loadAch());
+    if (allAchievementsDone(merged) && !merged.unique) merged.unique = true;   // 聚合成就补算
+    saveAch(merged);                     // saveAch 内部会自动回传服务器（补全）
+  } catch(e){}
+}
+// ---- 成就解锁统一入口：记录 + 同步服务器 + 画面上方通知（防重复） ----
+function unlockAchievement(key, reached){
+  const a = ACHIEVEMENTS.find(x => x.key === key);
+  if (!a || !reached) return;
+  const ach = loadAch();
+  if (ach[key]) return;                    // 已解锁过：不重复通知
+  ach[key] = true;
+  saveAch(ach);                            // 本地 + 自动同步服务器
+  renderAchievements();
+  notifyAchievement(a);                    // 画面上方滑入通知
+  if (allAchievementsDone(ach) && !ach.unique){   // 聚合成就：全部完成 → 解锁 💎 举世无双
+    ach.unique = true;
+    saveAch(ach);
+    renderAchievements();
+    notifyAchievement(ACHIEVEMENTS.find(x => x.key === 'unique'));
+  }
+}
+let achQueue = [], achNotifying = false;
+function notifyAchievement(a){
+  achQueue.push(a);
+  showNextNotify();
+}
+function showNextNotify(){
+  if (achNotifying || achQueue.length === 0) return;
+  achNotifying = true;
+  const a = achQueue.shift();
+  const el = document.getElementById('achNotify');
+  el.querySelector('.an-icon').textContent = a.icon;
+  el.querySelector('.an-text').textContent = '成就解锁：' + a.name;
+  el.classList.add('show');
+  setTimeout(function(){                  // 2.2 秒后滑出，播放下一条
+    el.classList.remove('show');
+    achNotifying = false;
+    showNextNotify();
+  }, 2200);
+}
+function renderAchievements(){
+  const ach = loadAch();
+  const equipped = loadEquip();
+  document.getElementById('acList').innerHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = a.check ? a.check(ach) : (a.need(best) || !!ach[a.key]);   // summit：最高分或服务器记录均算解锁
+    const btn = unlocked
+      ? (equipped === a.key
+          ? '<button class="ac-equip on" data-key="' + a.key + '">已佩戴</button>'
+          : '<button class="ac-equip" data-key="' + a.key + '">佩戴</button>')
+      : '<span class="ac-equip-ph"></span>';
+    return '<div class="ac-item' + (unlocked ? '' : ' ac-locked') + '">'
+      + btn
+      + '<span class="ac-icon">' + a.icon + '</span>'
+      + '<span class="ac-name">' + a.name + '</span>'
+      + '<span class="ac-desc">' + a.desc + '</span>'
+      + '<span class="ac-state">' + (unlocked ? '✅ 已解锁' : '🔒 未解锁') + '</span>'
+      + '</div>';
+  }).join('');
+}
+// 佩戴按钮（事件委托：点击佩戴 / 点已佩戴卸下）
+document.getElementById('acList').addEventListener('pointerdown', e => {
+  const btn = e.target.closest('.ac-equip');
+  if (!btn) return;
+  e.stopPropagation(); e.preventDefault();
+  const key = btn.dataset.key;
+  const newEquip = (loadEquip() === key) ? null : key;   // 点已佩戴 = 卸下
+  saveEquip(newEquip);
+  syncEquip(newEquip);
+  if (loggedUser){                       // 本地榜单数据同步更新（立即生效，不等网络）
+    const mine = lbData.find(r => r.nickname === loggedUser.nick);
+    if (mine) mine.equip = newEquip;
+  }
+  renderAchievements();
+  renderBoard();
+});
+document.getElementById('btnAchieve').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  renderAchievements();
+  document.getElementById('mainMenu').style.display = 'none';     // 隐藏主菜单，打开成就界面
+  document.getElementById('achievePanel').classList.add('show');
+});
+document.getElementById('acClose').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  document.getElementById('achievePanel').classList.remove('show');
+  document.getElementById('mainMenu').style.display = 'flex';     // 返回主菜单
+  loadBoard();                                                     // 刷新榜单（佩戴变更后拉最新）
+});
+// 鼠标按住列表直接拖动滚动（触摸走原生滑动；桌面预览窗/WebView 鼠标可用）
+function enableDragScroll(el){
+  let down = false, startY = 0, startTop = 0;
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse') return;          // 触摸/触屏笔用原生滚动
+    down = true; startY = e.clientY; startTop = el.scrollTop;
+    el.style.cursor = 'grabbing';
+    try { el.setPointerCapture(e.pointerId); } catch(err){}
+  });
+  el.addEventListener('pointermove', e => {
+    if (!down) return;
+    el.scrollTop = startTop - (e.clientY - startY);
+  });
+  const endDrag = function(){ down = false; el.style.cursor = ''; };
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+  el.addEventListener('pointerleave', endDrag);
+}
+enableDragScroll(document.getElementById('acList'));   // 成就列表可手动拖滑
+enableDragScroll(document.getElementById('lbList'));   // 排行榜列表同款拖滑
+document.getElementById('cfYes').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  document.getElementById('confirmPanel').classList.remove('show');
+  doLogout();
+});
+document.getElementById('cfNo').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  document.getElementById('confirmPanel').classList.remove('show');
+});
+// ============ 排行榜（Supabase：昵称 / 时间 / 分数） ============
+const lbList = document.getElementById('lbList');
+let lbData = [];
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtLbTime(iso){
+  try {
+    const d = new Date(iso);
+    return ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2)
+         + ' ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+  } catch(e){ return ''; }
+}
+async function loadBoard(){
+  try {
+    const res = await supabaseFetch('leaderboard?select=nickname,score,created_at,equip&order=score.desc,created_at.asc&limit=20');
+    if (!res.ok) return;                       // 表未建/网络异常：保留占位「⏳ 接入中…」
+    lbData = await res.json();
+    if (loggedUser){                           // 以服务器佩戴状态同步本地（跨设备一致）
+      const mine = lbData.find(r => r.nickname === loggedUser.nick);
+      // 本地已操作过佩戴 → 以本地为准（防服务器旧值/同步失败回跳）；从未操作 → 用服务器值（新设备同步）
+      if (mine && !hasLocalEquip()) saveEquip(mine.equip || null);
+    }
+    renderBoard();
+  } catch(e){}
+}
+function renderBoard(){
+  if (!lbData || lbData.length === 0){
+    lbList.innerHTML = '<div style="color:rgba(255,255,255,.45);text-align:center;padding-top:12px">暂无成绩，快来挑战！</div>';
+    return;
+  }
+  let html = '<div class="lb-head"><span class="lb-rank">排名</span><span class="lb-name">昵称</span><span class="lb-time">时间</span><span class="lb-score">分数</span></div>';
+  for (let i = 0; i < lbData.length; i++){
+    const r = lbData[i];
+    const mine = loggedUser && r.nickname === loggedUser.nick;
+    html += '<div class="lb-row' + (mine ? ' lb-mine' : '') + '">'
+      + '<span class="lb-rank">' + (i+1) + '</span>'
+      + '<span class="lb-name" title="' + escHtml(r.nickname) + '">' + (r.equip ? '<span class="lb-equip">' + equipIcon(r.equip) + '</span>' : '') + escHtml(r.nickname) + '</span>'
+      + '<span class="lb-time">' + fmtLbTime(r.created_at) + '</span>'
+      + '<span class="lb-score">' + r.score + '</span>'
+      + '</div>';
+  }
+  lbList.innerHTML = html;
+}
+// 结算自动提交（极限排行榜：仅极限模式计分，普通模式不上榜）
+// 一人一条记录：服务端函数只更新更高分（同分/低分不覆盖）
+let scoreSubmitted = false;
+async function submitScore(){
+  if (scoreSubmitted || !loggedUser || Math.floor(score) <= 0) return;
+  if (mode !== 'extreme') return;              // 极限排行榜专属
+  scoreSubmitted = true;
+  try {
+    const res = await supabaseFetch('rpc/upsert_leaderboard', {
+      method: 'POST',
+      body: JSON.stringify({ p_nickname: loggedUser.nick, p_score: Math.floor(score) })
+    });
+    if (res.ok){
+      if (hasLocalEquip()) syncEquip(loadEquip());   // 本地操作过佩戴才补同步（防清空服务器装备）
+      loadBoard();
+    }
+  } catch(e){}
+}
+async function submitAuth(){
+  if (submitting) return;
+  const nick = afNick.value.trim();
+  const pwd  = afPwd.value;
+  if (!/^[\u4e00-\u9fa5A-Za-z0-9_]{1,12}$/.test(nick)){
+    showAfMsg('昵称需 1~12 位（中文/字母/数字/下划线）'); return;
+  }
+  if (pwd.length < 6 || pwd.length > 32){
+    showAfMsg('密码需 6~32 位'); return;
+  }
+  const hash = hashPassword(pwd);
+  submitting = true;
+  try {
+    if (authMode === 'register'){
+      if (afPwd2.value !== pwd){ showAfMsg('两次密码不一致'); submitting = false; return; }
+      const res = await supabaseFetch('users', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ nickname: nick, password: hash })
+      });
+      if (res.ok){
+        saveLogin(nick, hash);
+        showAfMsg('注册成功，正在进入…', true);
+        setTimeout(enterMainMenu, 600);
+      } else {
+        const t = await res.text();
+        if (res.status === 409 || t.indexOf('duplicate') >= 0) showAfMsg('昵称已被注册，换一个试试');
+        else if (t.indexOf('PGRST205') >= 0) showAfMsg('数据库未就绪：请主人先在 Supabase 建表');
+        else showAfMsg('注册失败（' + res.status + '），请稍后重试');
+      }
+    } else {
+      // 登录：数据库侧比对（password=eq.<hash>，哈希不回传前端）
+      const res = await supabaseFetch('users?select=nickname&nickname=eq.' + encodeURIComponent(nick) + '&password=eq.' + hash);
+      if (res.ok){
+        const data = await res.json();
+        if (data && data.length > 0){
+          saveLogin(nick, hash);
+          showAfMsg('登录成功，正在进入…', true);
+          setTimeout(enterMainMenu, 600);
+        } else {
+          showAfMsg('昵称或密码不正确');
+        }
+      } else {
+        const t = await res.text();
+        if (t.indexOf('PGRST205') >= 0) showAfMsg('数据库未就绪：请主人先在 Supabase 建表');
+        else showAfMsg('登录失败（' + res.status + '），请稍后重试');
+      }
+    }
+  } catch(e){
+    showAfMsg('网络异常，请检查连接后重试');
+  } finally {
+    submitting = false;
+  }
+}
+document.getElementById('btnRegister').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); initAudio(); openAuthForm('register'); });
+document.getElementById('btnLogin').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); initAudio(); openAuthForm('login'); });
+document.getElementById('afSubmit').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); submitAuth(); });
+document.getElementById('afBack').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); closeAuthForm(); });
+['afNick','afPwd','afPwd2'].forEach(function(id){
+  document.getElementById(id).addEventListener('keydown', e => {
+    e.stopPropagation();                    // 阻止冒泡到 window（避免触发游戏按键）
+    if (e.key === 'Enter'){ e.preventDefault(); submitAuth(); }
+  });
+});
+// 主界面：模式选择
+const mmNormal = document.getElementById('mmNormal'), mmExtreme = document.getElementById('mmExtreme');
+mmNormal.addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  initAudio(); mode = 'normal'; reset(); startGame();   // 先设模式再 reset（否则 reset 用旧 mode）
+});
+mmExtreme.addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  initAudio(); mode = 'extreme'; reset(); startGame();
+});
+
+// 设置按钮：暂停游戏（暂停面板：继续/重新开始/主菜单）
+const btnSettings = document.getElementById('btnSettings');
+const pausePanel = document.getElementById('pausePanel');
+btnSettings.addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  if (state !== 'playing') return;
+  state = 'paused';
+  bgm.pause();
+  btnSettings.style.display = 'none';
+  pausePanel.classList.add('show');
+});
+document.getElementById('ppResume').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  if (state !== 'paused') return;
+  state = 'playing';
+  bgm.play().catch(function(){});
+  pausePanel.classList.remove('show');
+  btnSettings.style.display = 'flex';
+});
+document.getElementById('ppRestart').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  if (state !== 'paused') return;
+  initAudio();
+  reset(); startGame();
+  pausePanel.classList.remove('show');
+});
+document.getElementById('ppMenu').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  if (state !== 'paused') return;
+  state = 'ready';                       // 回主菜单（封面），BGM 停止
+  bgm.pause();
+  pausePanel.classList.remove('show');
+  btnSettings.style.display = 'none';
+  document.getElementById('mainMenu').style.display = 'flex';
+  loadBoard();
+  syncAchFromServer();
 });
 
 // ---------- 画布自适应 ----------
@@ -218,6 +1036,54 @@ function resize(){
   canvas.style.width  = (VW*r|0)+'px';
   canvas.style.height = (VH*r|0)+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  // 主界面尺寸跟随游戏画面（宽 80%、高 100%——上下与画面齐平，不超出）
+  const mm = document.getElementById('mainMenu');
+  if (mm){
+    const cw = parseFloat(canvas.style.width), ch = parseFloat(canvas.style.height);
+    if (cw > 0 && ch > 0){
+      mm.style.width  = Math.round(cw*0.9) + 'px';
+      mm.style.height = Math.round(ch) + 'px';
+    }
+  }
+  // 开始界面宽度跟随画布（高度自适应内容）
+  const am = document.getElementById('authMenu');
+  if (am){
+    const cw = parseFloat(canvas.style.width);
+    if (cw > 0) am.style.width = Math.round(cw*0.56) + 'px';
+  }
+  // 成就界面尺寸跟随画布（宽 90%、高 100%，与主菜单同规格）
+  const ap = document.getElementById('achievePanel');
+  if (ap){
+    const cw = parseFloat(canvas.style.width), ch = parseFloat(canvas.style.height);
+    if (cw > 0 && ch > 0){
+      ap.style.width  = Math.round(cw*0.9) + 'px';
+      ap.style.height = Math.round(ch) + 'px';
+    }
+  }
+  // 设置按钮：横屏跟随画布右上角（竖屏由 CSS body.portrait 规则处理）
+  if (!portrait){
+    const cw = parseFloat(canvas.style.width), ch = parseFloat(canvas.style.height);
+    if (cw > 0 && ch > 0){
+      btnSettings.style.left   = Math.round((innerWidth - cw)/2 + cw - 33) + 'px';
+      btnSettings.style.top    = Math.round((innerHeight - ch)/2 + 3) + 'px';
+      btnSettings.style.right  = 'auto';
+      btnSettings.style.bottom = 'auto';
+    }
+  } else {
+    btnSettings.style.left = btnSettings.style.top = btnSettings.style.right = btnSettings.style.bottom = '';
+  }
+  // 结算按钮：横屏跟随画布底部居中（防画布居中留白时 top:84% 掉出画面）
+  if (!portrait){
+    const cw = parseFloat(canvas.style.width), ch = parseFloat(canvas.style.height);
+    if (cw > 0 && ch > 0){
+      btnRestart.style.left   = Math.round((innerWidth - cw)/2 + cw/2) + 'px';
+      btnRestart.style.top    = Math.round((innerHeight - ch)/2 + ch*0.84) + 'px';
+      btnRestart.style.right  = 'auto';
+      btnRestart.style.bottom = 'auto';
+    }
+  } else {
+    btnRestart.style.left = btnRestart.style.top = btnRestart.style.right = btnRestart.style.bottom = '';
+  }
 }
 window.addEventListener('resize', resize);
 resize();
@@ -225,21 +1091,33 @@ resize();
 // ---------- 重置 ----------
 function reset(){
   obstacles = []; fishes = []; shards = [];
-  score = 0; fishCount = 0; distScore = 0; speed = 6; spawnDist = 500; night = false; nightMix = 0;   // 初始 0 条奶鱼
+  scoreSubmitted = false;                  // 新一局可重新提交成绩
+  heliBreakCount = 0;                      // 单局护体撞碎直升机计数清零
+  crocHitCount = 0;                        // 单局撞击鳄鱼计数清零
+  snowFishUsed = false;                    // 雪地行者：雪天奶鱼消耗标记清零
+  score = 0; fishCount = (mode === 'extreme' ? 0 : 10); distScore = 0; speed = 6; spawnDist = 500; night = false; nightMix = 0; hudLightMix = 0;   // 普通 10 鱼 / 极限 0 鱼
   dino.y = GROUND_Y; dino.vy = 0; dino.mode='run'; dino.onGround=true;
   invincible = 0; shieldHint = 0; zoom = 1;
   stormMix = 0; stormFlash = 0; stormTimer = 6;
   stormActive = false; stormNext = 12; stormDur = 0;
+  snowMix = 0; snowActive = false; snowNext = 22; snowDur = 0; snowHint = 0;
+  snowDepth = 0; snowElapsed = 0;
+  jumpQueued = false; jumpDelay = 0;
+  thornLevel = 0; thornClears = 0; thornHint = 0;
+  thornScore = 0; thornScoreBase = 0;
+  bgmBroken = false;                       // 新一局恢复 BGM 计时
   bgm.currentTime = 0; bgm.pause();
 }
 
 // 生成破碎碎片
 function spawnShards(o){
-  const colors = o.type==='heli'
-    ? ['#8B939B','#4E7A4E','#FF4D4D','#9FD8E8','#3D4A5A']
+  const isHeli = o.type==='heli';
+  const colors = isHeli
+    ? ['#8B939B','#4E7A4E','#FF4D4D','#9FD8E8','#3D4A5A','#2B2F36','#FFB020','#E8EEF2']   // 机身灰/迷彩绿/警示红/玻璃蓝/深蓝/螺旋桨黑/橙/白
     : (o.type==='croc' ? ['#4E8A3A','#3E6E2E','#6AA84F','#2F5A24'] : ['#8B939B','#6E767E','#AAB0B6']);
-  const n = o.type==='heli' ? 16 : 10;
+  const n = isHeli ? 34 : 10;                      // 直升机碎裂粒子增多（16→34 片）
   for (let i=0;i<n;i++){
+    const big = isHeli && i < 8;                   // 前 8 片大块（机身残骸）
     shards.push({
       x: o.x + (Math.random()-0.5)*o.w,
       y: o.y - Math.random()*o.h,
@@ -247,9 +1125,9 @@ function spawnShards(o){
       vy: -Math.random()*7 - 1,
       rot: Math.random()*6.28,
       vr: (Math.random()-0.5)*0.4,
-      size: 3 + Math.random()*5,
+      size: isHeli ? (big ? 6+Math.random()*5 : 2+Math.random()*4) : 3+Math.random()*5,
       color: colors[Math.floor(Math.random()*colors.length)],
-      life: 0.6 + Math.random()*0.3
+      life: isHeli ? 0.7+Math.random()*0.4 : 0.6+Math.random()*0.3
     });
   }
 }
@@ -262,7 +1140,7 @@ function markLoaded(){ loadedRes++; }
 function checkPreload(){
   if (preloadDone || loadedRes < TOTAL_RES) return;
   preloadDone = true;
-  setTimeout(function(){ if (state === 'loading') state = 'ready'; }, 300);
+  setTimeout(function(){ if (state === 'loading'){ state = 'ready'; showStartUI(); } }, 300);
 }
 
 // ---------- 直升机吊挂动画（雪碧图：158 帧合并为 1 张图 1 个请求，11fps 裁剪播放） ----------
@@ -302,11 +1180,22 @@ function playHeliSfx(){
 // ===== 背景音乐（BGM：放完 = 到达终点 = 通关） =====
 const bgm = new Audio('assets/bgm.mp3');
 bgm.preload = 'auto';
+let bgmBroken = false;                 // 音频故障标记：BGM 提前 ended / error → 进度降级为距离估算
+const DIST_TOTAL = 2330;               // 全程总距离（203s BGM × 速度公式推导：D(t)=1680*(e^(t/233.33)-1)）
 // canplaythrough：整首下载完才就绪（防边播边下卡顿；BGM 已压 128k/3.1MB，等待可接受）
 bgm.addEventListener('canplaythrough', function(){ markLoaded(); checkPreload(); });
-bgm.addEventListener('error', function(){ markLoaded(); checkPreload(); });
+bgm.addEventListener('error', function(){
+  markLoaded(); checkPreload();
+  if (state === 'playing') bgmBroken = true;   // 播放中音频出错 → 距离进度兜底
+});
 bgm.addEventListener('ended', function(){
-  if (state === 'playing') winGame();
+  // BGM 放完 = 到达雪峰 = 通关。
+  // ⚠️ 防御：音频环境异常导致 BGM 提前 ended 时会误判通关（score 被硬设为 9999 上榜）——
+  // 只有分数接近终点（进度 ≥99%，score ≥ 9900）才判定通关，提前中断只算音频故障、不假通关。
+  if (state === 'playing'){
+    if (Math.floor(score) >= 9900) winGame();
+    else bgmBroken = true;                     // 音频故障 → 进度降级为距离估算，跑够距离仍可通关
+  }
 });
 
 // ===== 复活音效（奶鱼护体触发时播放） =====
@@ -323,8 +1212,18 @@ function spawnObstacle(){
   let o;
   if (r < 0.3){                                    // 大石块（超大）
     o = { type:'rock', x:VW+40, w:58, h:42, y:GROUND_Y };
-  } else if (r < 0.84){                            // 大石块（大，含原鳄鱼区间）
+  } else if (r < 0.70){                            // 大石块（大，含原鳄鱼区间）
     o = { type:'rock', x:VW+40, w:44, h:32, y:GROUND_Y };
+  } else if (r < 0.84){                            // 荆棘丛生（14%：3~8 株连续刷新，无视前后障碍间距）
+    const nThorn = 3 + Math.floor(Math.random()*6);   // 3~8 株
+    let tx = VW + 40;
+    for (let t=0;t<nThorn;t++){
+      const tw = 28 + Math.random()*24;               // 宽 28~52 随机
+      obstacles.push({ type:'bramble', x: tx, w: tw, h: tw*0.85, y: GROUND_Y });
+      tx += 14 + Math.random()*26;                    // 株距 14~40
+    }
+    spawnDist = 0;                                     // 无视间距：下一障碍紧贴荆棘丛生成（可与石块贴一起）
+    return;                                            // 已直接 push，跳过结尾
   } else if (r < 0.9){
     if (night){                                    // 鳄鱼：仅黑夜，频率 6%（原 30% 的五分之一）
       o = { type:'croc', x:VW+40, w:136, h:48, y:GROUND_Y, vx: 3.2 };
@@ -341,20 +1240,40 @@ function spawnObstacle(){
 function update(dt){
   if (state !== 'playing') return;
   const k = dt*60;                                  // 归一化到 60fps 基准
+  // 雪天机制：空中时场景减速（落地恢复）；荆棘缠身每层减速（1层0.82/2层0.64/3层0.46）
+  const snowAirSlow = (snowMix > 0.3 && !dino.onGround) ? 0.72 : 1;
+  const thornSlow = thornLevel > 0 ? (1 - 0.18*thornLevel) : 1;
+  const sceneK = k * snowAirSlow * thornSlow;
+  // 雪天地滑：起跳延迟（到点且仍在地面则起跳）
+  if (jumpQueued){
+    jumpDelay -= dt;
+    if (jumpDelay <= 0){
+      jumpQueued = false;
+      if (dino.onGround && state === 'playing' && thornLevel <= 0){
+        dino.vy = -10; dino.mode='jump'; dino.onGround=false; sfx.jump();
+      }
+    }
+  }
   dino.animT += dt;
 
   // 速度随距离分递增（每280分+1，上限14.5；与显示分独立，保证难度曲线不变）
   speed = Math.min(6 + distScore/280, 14.5);
-  distScore += speed * 0.02 * k;
+  distScore += speed * 0.02 * sceneK;
   // 显示分 = BGM 进度 × 9999（匀速增长，终点正好 9999）
-  const progress = (isFinite(bgm.duration) && bgm.duration > 0) ? Math.min(1, bgm.currentTime/bgm.duration) : 0;
+  const progress = (isFinite(bgm.duration) && bgm.duration > 0 && !bgmBroken)
+    ? Math.min(1, bgm.currentTime/bgm.duration)
+    : Math.min(1, distScore/DIST_TOTAL);       // 音频故障：按距离估算进度（不依赖 BGM）
   score = Math.floor(progress * 9999);
+  if (progress >= 1 && state === 'playing') winGame();   // 距离跑满 100% 兜底通关（BGM 故障时也生效）
   night = (Math.floor(distScore/400) % 2) === 1;        // 日夜切换（按距离分，保持原节奏）
   nightMix += ((night ? 1 : 0) - nightMix) * Math.min(1, dt*1.6);   // 平滑渐变过渡
+  // HUD 文字亮度：非雾天的黑天 → 渐变白字，雾天/白天渐变回深灰（雾里白字看不清）
+  const hudTarget = (night && fog.opacity < 0.15) ? 1 : 0;
+  hudLightMix += (hudTarget - hudLightMix) * Math.min(1, dt*2.5);
   // ==== 雷暴天（BGM 过半后事件式触发；接近终点时停止） ====
   const halfReached = (isFinite(bgm.duration) && bgm.duration > 0 && bgm.currentTime/bgm.duration > 0.5);
   const ending = (isFinite(bgm.duration) && bgm.duration - bgm.currentTime <= 6);   // 接近终点（剩余≤6秒）禁天气/障碍
-  if (halfReached && !ending){
+  if (halfReached && !ending && !snowActive){   // 雪天与雷暴互斥（交替出现）
     if (!stormActive){
       stormNext -= dt;
       if (stormNext <= 0){
@@ -384,7 +1303,7 @@ function update(dt){
     }
   }
   stormFlash = Math.max(0, stormFlash - dt*1.5);   // 白闪衰减放慢（约 0.6 秒，更有存在感）
-  groundOffset = (groundOffset + speed*k) % 24;
+  groundOffset = (groundOffset + speed*sceneK) % 24;
 
   // ==== 雾天事件（前一半仅夜晚起雾；后一半随时；接近终点不再起雾） ====
   // halfReached / ending 已在雷暴逻辑中声明，此处复用
@@ -394,7 +1313,7 @@ function update(dt){
     fog.nextIn = 8;
     fog.opacity = Math.max(0, fog.opacity - dt*2.2);
   } else if (!fog.active){
-    fog.nextIn -= dt;
+    fog.nextIn -= dt * (snowActive ? 2.2 : 1);   // 雪天起雾更频繁（时不时起雾）
     if (fog.nextIn <= 0){
       fog.active = true;
       fog.duration = 8 + Math.random()*8;   // 持续 8~16 秒
@@ -412,6 +1331,50 @@ function update(dt){
   fog.opacity += (fogTarget - fog.opacity) * Math.min(1, dt*2.2);   // 平滑淡入淡出
   if (fog.hint > 0) fog.hint -= dt;
 
+  // ==== 雪天事件（全程都可能出现，与雷暴交替：天空飘雪 + 起雾更频繁） ====
+  if (!ending){
+    if (!snowActive && !stormActive){
+      snowNext -= dt;
+      if (snowNext <= 0){
+        snowActive = true;
+        snowDur = 18 + Math.random()*12;   // 持续 18~30 秒（延长）
+        snowElapsed = 0;
+        snowHint = 2.2;
+        snowFishUsed = false;              // 新雪天开始：重置奶鱼消耗标记
+      }
+    } else if (snowActive){
+      snowDur -= dt;
+      snowElapsed += dt;                   // 本次雪天已持续秒数
+      if (snowDur <= 0){
+        snowActive = false;
+        if (!snowFishUsed) unlockAchievement('snowWalker', true);   // 整场雪天没用奶鱼且存活 → 解锁
+        snowNext = 25 + Math.random()*20;  // 25~45 秒后可能再次下雪
+      }
+    }
+  } else {
+    snowActive = false;
+    snowNext = 22;
+  }
+  const snowTarget = (!ending && snowActive) ? 1 : 0;
+  snowMix += (snowTarget - snowMix) * Math.min(1, dt*0.8);
+  // 积雪深度：雪下 4 秒后才开始积雪，8 秒内积到满；雪停后缓慢消融
+  if (snowActive){
+    const snowGrow = snowElapsed > 4 ? Math.min(1, (snowElapsed-4)/8) : 0;
+    snowDepth += (snowGrow - snowDepth) * Math.min(1, dt*0.8);
+  } else {
+    snowDepth = Math.max(0, snowDepth - dt*0.12);
+  }
+  if (snowHint > 0) snowHint -= dt;
+  if (thornHint > 0) thornHint -= dt;   // 荆棘提示淡出（缠身播报后自动消失）
+  // 雪粒子更新（常驻，绘制时按 snowMix 透明度显示）
+  const stime = performance.now()/1000;
+  for (const p of snowParticles){
+    p.x += (p.vx + Math.sin(stime*1.3 + p.ph)*0.4) * k;
+    p.y += p.vy * k;
+    if (p.y > VH+5){ p.y = -5; p.x = Math.random()*VW; }
+    if (p.x > VW+5) p.x = -5;
+  }
+
   // 奶龙物理
   if (!dino.onGround){
     dino.vy += 0.55 * k;
@@ -422,8 +1385,8 @@ function update(dt){
 
   // 障碍 / 奶鱼移动
   for (const o of obstacles){
-    o.x -= speed*k;
-    if (o.type === 'croc') o.x -= (o.vx||0)*k;   // 鳄鱼额外爬行速度（比石头快）
+    o.x -= speed*sceneK;
+    if (o.type === 'croc') o.x -= (o.vx||0)*sceneK;   // 鳄鱼额外爬行速度（比石头快）
     // 直升机进场瞬间播放出场音效（每架只响一次，实例池支持重叠）
     if (o.type === 'heli' && !o.sfxPlayed && o.x <= VW + 60){
       o.sfxPlayed = true;
@@ -431,12 +1394,12 @@ function update(dt){
     }
   }
   obstacles = obstacles.filter(o => o.x > -60);
-  for (const f of fishes) f.x -= speed*k;
+  for (const f of fishes) f.x -= speed*sceneK;
   fishes = fishes.filter(f => f.x > -40);
 
   // 生成节奏（接近终点 ending 时停止生成障碍/奶鱼，专心冲刺）
   if (!ending){
-    spawnDist -= speed*k;
+    spawnDist -= speed*sceneK;
     if (spawnDist <= 0){
       spawnObstacle();
       // 奶鱼高度随机（地面以上 68~98px，跳跃可及），出现频率 8.3%（25%÷3，保命道具更稀有）
@@ -464,10 +1427,27 @@ function update(dt){
       const o = obstacles[i];
       const ob = { x1:o.x-o.w/2+5, y1:o.y-o.h+3, x2:o.x+o.w/2-5, y2:o.y-2 };
       if (dbox.x1<ob.x2 && dbox.x2>ob.x1 && dbox.y1<ob.y2 && dbox.y2>ob.y1){
+        if (o.type === 'croc'){           // 撞击鳄鱼计数（🐊 鳄啊~成就，一局 3 次）
+          crocHitCount++;
+          if (crocHitCount >= 3) unlockAchievement('crocHit', true);
+        }
+        if (o.type === 'bramble'){
+          // 荆棘缠身：不会死，每撞 +1 层（最多 3 层，减速递增），需连续点蹲每 3 次去除一层
+          if (thornLevel < 3) thornLevel++;
+          thornHint = 2.5;
+          sfx.fish();
+          obstacles.splice(i,1);
+          continue;
+        }
         if (fishCount > 0){
           // 保命：奶鱼 -1，障碍破碎，短暂无敌 + 复活音效
           fishCount--;
+          if (snowActive) snowFishUsed = true;   // 雪天中消耗奶鱼：雪地行者标记
           spawnShards(o);
+          if (o.type === 'heli'){       // 护体撞碎直升机：计数，够 8 架解锁 🚁 Man！
+            heliBreakCount++;
+            if (heliBreakCount >= 8) unlockAchievement('heliMan', true);
+          }
           obstacles.splice(i,1);
           invincible = 1.5;
           shieldHint = 1.2;
@@ -486,6 +1466,15 @@ function update(dt){
     }
   }
   // 碎片物理（重力 + 摩擦 + 旋转）
+  // 荆棘行者累积：缠身期间连续前进 2500 分（荆棘解除则重新计数）
+  if (thornLevel > 0){
+    thornScore += score - thornScoreBase;
+    thornScoreBase = score;
+    if (thornScore >= 2500) unlockAchievement('thornWalker', true);
+  } else {
+    thornScore = 0;
+    thornScoreBase = score;
+  }
   for (let i=shards.length-1;i>=0;i--){
     const s = shards[i];
     s.life -= dt;
@@ -502,10 +1491,12 @@ function gameOver(){
   state = 'gameover'; sfx.hit();
   bgm.pause();
   btnRestart.style.display = 'block';          // 必须点击按钮才能再来一局
+  btnSettings.style.display = 'none';
   if (Math.floor(score) > best){
     best = Math.floor(score);
     try { localStorage.setItem('nailongRunBestV2', best); } catch(e){}
   }
+  submitScore();                                // 结算自动提交成绩
 }
 
 function winGame(){
@@ -519,6 +1510,11 @@ function winGame(){
     best = Math.floor(score);
     try { localStorage.setItem('nailongRunBestV2', best); } catch(e){}
   }
+  submitScore();                                // 通关自动提交 9999
+  // 成就记录：极限雪峰（极限模式通关）/ 年年有鱼（剩余奶鱼≥6）
+  unlockAchievement('summit', best >= 9999);
+  unlockAchievement('extremeWin', mode === 'extreme');
+  unlockAchievement('fish6', fishCount >= 6);
   // 胜利三连音
   beep(523, 784, .18, 'sine', .15);
   setTimeout(function(){ beep(659, 988, .18, 'sine', .15); }, 180);
@@ -705,9 +1701,150 @@ function drawRock(x, y, w, h){
   ctx.fillStyle = 'rgba(90,180,90,.7)';
   ctx.beginPath(); ctx.ellipse(x+w*0.18, y-h*0.68, 3.5, 2.5, 0.5, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.ellipse(x-w*0.22, y-h*0.4, 2.5, 2, -0.3, 0, Math.PI*2); ctx.fill();
+  // 积雪（下雪时石头顶部盖厚雪 + 底部雪堆，随雪量变厚变实）
+  if (snowDepth > 0.02){
+    const sh = 3 + 5*snowDepth;                           // 顶部雪厚 3~8px（加厚）
+    ctx.fillStyle = 'rgba(240,248,255,' + (0.65 + 0.35*snowDepth) + ')';
+    ctx.beginPath();
+    ctx.moveTo(x-w/2+10, y-h+1);
+    ctx.lineTo(x-w/8, y-h-sh);
+    ctx.lineTo(x+w/8, y-h+4-sh);
+    ctx.lineTo(x+w/2-6, y-h+1);
+    ctx.lineTo(x+w/2-8, y-h+4);                          // 沿石头顶面轮廓回绕
+    ctx.lineTo(x+w/8, y-h+4);
+    ctx.lineTo(x-w/8, y-h);
+    ctx.closePath(); ctx.fill();
+    // 底部积雪（石头脚边雪堆）
+    ctx.fillStyle = 'rgba(240,248,255,' + (0.5 + 0.4*snowMix) + ')';
+    ctx.beginPath();
+    ctx.ellipse(x, y+2, w*0.5, 2 + 2*snowMix, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
   // 底部阴影
   ctx.fillStyle = 'rgba(0,0,0,.12)';
   ctx.beginPath(); ctx.ellipse(x, y, w*0.55, 3, 0, 0, Math.PI*2); ctx.fill();
+}
+// ---------- 绘制：荆棘丛（缠身 debuff 障碍，棕绿纸条 + 尖刺） ----------
+function drawBramble(x, y, w, h){
+  // 棕褐色弯曲枝条（底部交错斜出）
+  ctx.strokeStyle = '#8B5A2B';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  const nb = 4;
+  for (let i=0;i<nb;i++){
+    const bx = x - w*0.36 + i*(w*0.72)/(nb-1);
+    const lean = (i - (nb-1)/2) * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(bx, y);
+    ctx.quadraticCurveTo(bx - 4 + lean*6, y - h*0.45, bx + lean*10, y - h*0.72);
+    ctx.stroke();
+  }
+  // 绿色纸条（细长叶状，左右交错斜出）
+  ctx.strokeStyle = '#3E8E41';
+  ctx.lineWidth = 2;
+  for (let i=0;i<6;i++){
+    const bx = x - w*0.38 + i*(w*0.76)/5;
+    const by = y - h*0.15 - (i%3)*h*0.22;
+    const dir = (i%2===0) ? 1 : -1;
+    const len = 6 + (i%3)*4;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.quadraticCurveTo(bx + dir*len*0.5, by - len*0.6, bx + dir*len*0.9, by - len);
+    ctx.stroke();
+  }
+  // 浅绿尖刺（三角朝上）
+  ctx.fillStyle = '#A5D6A7';
+  for (let i=0;i<6;i++){
+    const bx = x - w*0.3 + i*w*0.12;
+    const by = y - h*0.55 - (i%2)*10;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx + 3, by - 10);
+    ctx.lineTo(bx + 6, by);
+    ctx.closePath(); ctx.fill();
+  }
+  // 底部阴影
+  ctx.fillStyle = 'rgba(0,0,0,.12)';
+  ctx.beginPath(); ctx.ellipse(x, y, w*0.5, 3, 0, 0, Math.PI*2); ctx.fill();
+}
+// ---------- 绘制：奶龙身上荆棘（缠身视觉，按层数叠加覆盖递增） ----------
+function drawThornOnDino(){
+  const L = thornLevel;
+  if (L <= 0) return;
+  // 跟随奶龙身体的上下浮动（bob 与 drawDino 一致）
+  const bob = (dino.mode === 'run' && dino.onGround) ? Math.sin(performance.now()/1000*13)*3.2 : 0;
+  const bx = dino.x, by = dino.y + bob;
+  // 棕色枝条：层数越多缠得越满（1层4根 / 2层6根 / 3层10根，绕身体分布）
+  ctx.strokeStyle = '#8B5A2B';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  const branches = 2 + L*2 + (L===3 ? 2 : 0);
+  const span = (L===3) ? 13 : 8;                 // 垂直分布半径（3层往上覆盖到头部）
+  for (let i=0;i<branches;i++){
+    const t = i / Math.max(1, branches-1);
+    const ang = -1.1 + t*2.2;                    // 从左上到右下绕身分布
+    const cx = bx + Math.cos(ang)*4, cy = by - 16 + Math.sin(ang)*span;
+    const ex = bx + Math.cos(ang)*11, ey = by - 16 + Math.sin(ang)*span + 3*Math.sin(i*2.1);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.quadraticCurveTo(bx + Math.cos(ang)*7, by - 16 + Math.sin(ang)*span, ex, ey);
+    ctx.stroke();
+  }
+  // 绿色纸条（交错，覆盖身体更多部位）
+  ctx.strokeStyle = '#3E8E41';
+  ctx.lineWidth = 2;
+  const leaves = 2 + L*2 + (L===3 ? 2 : 0);
+  for (let i=0;i<leaves;i++){
+    const t = i / Math.max(1, leaves-1);
+    const lx = bx - 10 + t*20, ly = by - 20 - (L===3 && i>=leaves-2 ? 8 : 0) + (i%2)*6;
+    const dir = (i%2===0) ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.quadraticCurveTo(lx + dir*4, ly - 5, lx + dir*7, ly - 9);
+    ctx.stroke();
+  }
+  // 浅绿尖刺（按层，覆盖递增）
+  ctx.fillStyle = '#A5D6A7';
+  const spikes = 2 + L*2 + (L===3 ? 2 : 0);
+  for (let i=0;i<spikes;i++){
+    const t = i / Math.max(1, spikes-1);
+    const lx = bx - 10 + t*20, ly = by - 22 - (L===3 && i>=spikes-2 ? 8 : 0) - (i%2)*4;
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.lineTo(lx + 2.5, ly - 7);
+    ctx.lineTo(lx + 5, ly);
+    ctx.closePath(); ctx.fill();
+  }
+  // 3 层：额外荆棘缠到头部（更满更密）
+  if (L === 3){
+    ctx.strokeStyle = '#8B5A2B';
+    ctx.lineWidth = 2;
+    for (let i=0;i<3;i++){
+      const hx = bx - 6 + i*6, hy = by - 26;
+      ctx.beginPath();
+      ctx.moveTo(hx, hy);
+      ctx.quadraticCurveTo(hx + 2, hy - 5, hx + (i%2 ? -1 : 1)*4, hy - 8);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#3E8E41';
+    for (let i=0;i<2;i++){
+      const hx = bx - 4 + i*8, hy = by - 28;
+      const dir = i%2 ? 1 : -1;
+      ctx.beginPath();
+      ctx.moveTo(hx, hy);
+      ctx.quadraticCurveTo(hx + dir*3, hy - 4, hx + dir*6, hy - 7);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#A5D6A7';
+    for (let i=0;i<2;i++){
+      const hx = bx - 3 + i*6, hy = by - 30;
+      ctx.beginPath();
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx + 2.5, hy - 6);
+      ctx.lineTo(hx + 5, hy);
+      ctx.closePath(); ctx.fill();
+    }
+  }
 }
 function drawHeliBody(x, y, t){
   // 侧视像素军用直升机（放大版，机头朝左 = 迎面飞来）
@@ -829,6 +1966,17 @@ function drawRain(t){
   }
 }
 
+// ---------- 绘制：飘雪（雪天粒子，前景） ----------
+function drawSnow(){
+  if (snowMix <= 0.02) return;
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.75*snowMix) + ')';
+  for (const p of snowParticles){
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
 // ---------- 绘制：背景 ----------
 function drawBackground(t){
   const p = nightMix;                                 // 0=白天 1=夜晚
@@ -870,13 +2018,23 @@ function drawBackground(t){
   }
   ctx.lineTo(VW, GROUND_Y);
   ctx.closePath(); ctx.fill();
-  // 地面（扩大覆盖，镜头拉远时不露矩形边界）
+  // 地面（扩大覆盖，镜头拉远时不露矩形边界）——草地保持原色，积雪只盖表面
   ctx.fillStyle = ground;
   ctx.fillRect(-120, GROUND_Y, VW+240, VH-GROUND_Y+120);
-  ctx.fillStyle = line;
+  const snowCover = Math.max(0, snowDepth);                  // 积雪程度（延迟积雪，随雪天渐变）
+  // line 是 'rgb(...)' 格式（不能直接喂给 lerpColor 的 hex 解析）→ 解析后与雪白(#F2F7FC)混合
+  const _lm = line.match(/\d+/g);
+  const lineCol = 'rgb(' + Math.round(+_lm[0]+(242-+_lm[0])*snowCover) + ',' + Math.round(+_lm[1]+(247-+_lm[1])*snowCover) + ',' + Math.round(+_lm[2]+(252-+_lm[2])*snowCover) + ')';
+  ctx.fillStyle = lineCol;
   ctx.fillRect(0, GROUND_Y, VW, 2);
+  // 积雪层（下雪时地表表面覆盖一层雪，随雪量变厚/变实）
+  if (snowMix > 0.02){
+    const snowH = 3 + 9*snowMix;                               // 雪层厚度 3~12px
+    ctx.fillStyle = 'rgba(235,245,255,' + (0.5 + 0.5*snowMix) + ')';
+    ctx.fillRect(-120, GROUND_Y - snowH*0.3, VW+240, snowH);
+  }
   // 滚动小草
-  ctx.fillStyle = line;
+  ctx.fillStyle = lineCol;
   for (let x=-24; x<VW+24; x+=24){
     const gx = x + groundOffset;
     ctx.fillRect(gx, GROUND_Y+8, 2, 5);
@@ -892,18 +2050,24 @@ function roundRect(x, y, w, h, r){
   ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r);
   ctx.closePath();
 }
+// HUD 文字颜色：深灰(43) → 白(255) 按 hudLightMix 插值，alpha 同步过渡
+function hudCol(a0, a1){
+  const c = Math.round(43 + (255-43)*hudLightMix);
+  const al = a0 + (a1-a0)*hudLightMix;
+  return 'rgba(' + c + ',' + c + ',' + c + ',' + al.toFixed(2) + ')';
+}
 function drawUI(){
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(43,43,43,.75)';
+  ctx.fillStyle = hudCol(0.75, 0.9);
   ctx.font = 'bold 22px "Microsoft YaHei", monospace';
-  ctx.fillText('得分 ' + Math.floor(score), 20, 16);
+  ctx.fillText('得分 ' + Math.floor(score), 8, 16);
   ctx.font = 'bold 14px "Microsoft YaHei", monospace';
-  ctx.fillStyle = 'rgba(43,43,43,.55)';
-  ctx.fillText('最高 ' + best, 20, 44);
+  ctx.fillStyle = hudCol(0.55, 0.8);
+  ctx.fillText('最高 ' + best, 8, 44);
   // 奶鱼计数
-  drawFish(20, 66);
-  ctx.fillStyle = 'rgba(43,43,43,.6)';
-  ctx.fillText('× ' + fishCount, 36, 62);
+  drawFish(8, 66);
+  ctx.fillStyle = hudCol(0.6, 0.85);
+  ctx.fillText('× ' + fishCount, 24, 62);
 }
 // ---------- 加载界面（资源就绪前显示，就绪后自动进封面） ----------
 function drawLoading(){
@@ -936,24 +2100,7 @@ function drawLoading(){
 }
 
 function drawReady(){
-  ctx.save();
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(43,43,43,.85)';
-  ctx.font = 'bold 52px "Microsoft YaHei", sans-serif';
-  ctx.fillText('奶 龙 快 跑', VW/2, 62);
-  ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
-  ctx.fillStyle = '#E8590C';
-  ctx.fillText('冲鸭！越过石块，蹲下躲避直升机，冲向最终彩蛋!!!', VW/2, 122);
-  ctx.font = '16px "Microsoft YaHei", sans-serif';
-  ctx.fillStyle = 'rgba(43,43,43,.65)';
-  ctx.fillText('空格 / 点击 = 跳跃    按住 ↓ = 蹲下（手机长按蹲键）', VW/2, 150);
-  ctx.fillStyle = '#2B8A3E';
-  ctx.font = 'bold 24px "Microsoft YaHei", sans-serif';
-  const blink = Math.sin(performance.now()/300) > 0 ? 1 : 0.35;
-  ctx.globalAlpha = blink;
-  ctx.fillText('按 空格 / 点击 开始', VW/2, 190);
-  ctx.globalAlpha = 1;
-  ctx.restore();
+  // 封面文字已清除（主界面面板承担标题/模式/提示），背景场景由 draw() 主流程绘制
 }
 function drawGameOver(){
   ctx.fillStyle = 'rgba(0,0,0,.35)';
@@ -991,7 +2138,7 @@ function drawFog(){
   if (fog.opacity <= 0.01) return;
   const a = fog.opacity;
   // 雾色随天气：白天=白雾，夜晚/雷暴=蓝灰雾
-  const cool = Math.max(nightMix, stormMix);
+  const cool = Math.max(nightMix, stormMix, snowMix);   // 雾色随天气：白天白雾，夜晚/雷暴/雪天偏冷蓝
   const R1 = Math.round(190 + (245-190)*cool);
   const G1 = Math.round(205 + (245-205)*cool);
   const B1 = Math.round(225 + (240-225)*cool);
@@ -1082,7 +2229,7 @@ function drawProgress(){
   const dur = bgm.duration;
   if (!isFinite(dur) || dur <= 0) return;
   const p = Math.min(1, bgm.currentTime / dur);
-  const barX = 30, barY = GROUND_Y + 24, barW = VW - 60, barH = 8;
+  const barX = 30, barY = VH - 40, barW = VW - 60, barH = 8;   // 进度条相对底部（画布加高后下移）
   // 轨道
   ctx.fillStyle = 'rgba(0,0,0,.28)';
   roundRect(barX, barY, barW, barH, 4); ctx.fill();
@@ -1105,7 +2252,7 @@ function drawProgress(){
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText('🎵', barX - 22, barY + barH/2);
   ctx.textAlign = 'right';
-  ctx.fillText('🏔️', barX + barW + 22, barY - 12);   // 终点标记移到进度条上方，避开右下角署名
+  ctx.fillText('🏔️', barX + barW + 22, barY + 2);   // 终点标记与进度条对齐（避开右下角署名）
 }
 
 // ---------- 绘制：通关字幕 ----------
@@ -1165,6 +2312,11 @@ function draw(){
     ctx.fillStyle = 'rgba(45,55,80,' + (0.35*stormMix) + ')';
     ctx.fillRect(-120, -120, VW+240, VH+240);
   }
+  // 雪天：背景轻微冷白罩（雪夜氛围）
+  if (snowMix > 0.02){
+    ctx.fillStyle = 'rgba(225,238,252,' + (0.10*snowMix) + ')';
+    ctx.fillRect(-120, -120, VW+240, VH+240);
+  }
   // 终点雪峰：BGM 剩余 5 秒时出现，2 秒内滑入画面中央偏右
   if (nearing || state === 'win'){
     let snowX = VW*0.62;
@@ -1179,6 +2331,7 @@ function draw(){
     if (o.type==='chili') drawChili(o.x, o.y, o.h);
     else if (o.type==='rock') drawRock(o.x, o.y, o.w, o.h);
     else if (o.type==='croc') drawCroc(o.x, o.y, t, o.w, o.h);
+    else if (o.type==='bramble') drawBramble(o.x, o.y, o.w, o.h);
     else drawHeli(o.x, o.y, t, o.w, o.h);
   }
   // 碎片
@@ -1196,7 +2349,9 @@ function draw(){
   if (invincible > 0 && state === 'playing' && Math.floor(performance.now()/60)%2===0) ctx.globalAlpha = 0.35;
   drawDino();
   ctx.globalAlpha = 1;
+  if (thornLevel > 0 && state === 'playing') drawThornOnDino();   // 荆棘缠身视觉
   drawRain(t);          // 雨滴在前景（淋在奶龙身上）
+  drawSnow();           // 雪花在前景（飘雪）
   drawFog();
   ctx.restore();
 
@@ -1213,6 +2368,16 @@ function draw(){
     ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
     ctx.fillText('🌫️ 起雾了！前方视线受阻！', VW/2, 34);
   }
+  if (snowHint > 0 && state === 'playing'){
+    ctx.fillStyle = 'rgba(255,255,255,' + Math.min(1, snowHint*1.4) + ')';
+    ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+    ctx.fillText('❄️ 下雪了！', VW/2, 34);
+  }
+  if (thornHint > 0 && state === 'playing'){
+    ctx.fillStyle = 'rgba(255,255,255,' + Math.min(1, thornHint*1.4) + ')';
+    ctx.font = 'bold 15px "Microsoft YaHei", sans-serif';
+    ctx.fillText('🌿 荆棘缠身！连续点击下蹲挣脱！', VW/2, 34);
+  }
   // 奶鱼护体提示
   if (shieldHint > 0 && state === 'playing'){
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -1221,14 +2386,24 @@ function draw(){
     ctx.fillText('🐟 奶鱼护体！障碍已粉碎！', VW/2, 58);
   }
   if (state === 'playing'){ drawUI(); drawProgress(); }
+  // 极限模式标识：最左上角小红字
+  if (mode === 'extreme' && state === 'playing'){
+    ctx.save();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillStyle = '#FF5252';
+    ctx.font = 'bold 12px "Microsoft YaHei", sans-serif';
+    ctx.fillText('极限模式', 8, 2);
+    ctx.restore();
+  }
   if (state === 'ready') drawReady();
   if (state === 'gameover'){ drawUI(); drawGameOver(); }
   if (state === 'win'){ drawWin(); }
+  // 暂停时画面静止（update 冻结），遮罩由 #pausePanel 面板承担
 
   // 右下角署名
   ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
   ctx.fillStyle = 'rgba(43,43,43,.32)';
-  ctx.font = '11px "Microsoft YaHei", sans-serif';
+  ctx.font = '13px "Microsoft YaHei", sans-serif';
   ctx.fillText('「随枫」出品', VW - 10, VH - 4);
 }
 
