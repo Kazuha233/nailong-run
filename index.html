@@ -31,7 +31,7 @@
   .btn:active { background:rgba(255,255,255,.38); }
   #btnJump { right:22px; }  /* 跳 → 右下（顺手） */
   #btnDuck  { left:22px; }  /* 蹲 → 左下 */
-  @media (pointer:coarse) { .btn { display:flex; } }
+  /* 手机版已改为点画面左半蹲/右半跳（不再显示跳蹲按钮） */
   #btnRestart {
     position:absolute; left:50%; top:84%; transform:translate(-50%,-50%);
     display:none; padding:10px 32px; font-size:18px; font-weight:bold;
@@ -43,19 +43,19 @@
   /* 设置（暂停）面板：统一居中面板，内部标题 + 三按钮竖排 */
   #pausePanel {
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    display:none; flex-direction:column; align-items:center; gap:8px;
-    background:rgba(16,16,28,.88); border:2px solid rgba(255,255,255,.18);
-    border-radius:14px; padding:14px 26px; z-index:25;
+    display:none; flex-direction:column; align-items:center; gap:0.417em;
+    background:rgba(16,16,28,.88); border:0.104em solid rgba(255,255,255,.18);
+    border-radius:0.729em; padding:0.729em 1.354em; z-index:25;
     font-family:"Microsoft YaHei",sans-serif;
   }
   #pausePanel.show { display:flex; }
-  #ppTitle { color:#fff; font-size:18px; font-weight:bold; margin-bottom:4px; }
+  #ppTitle { color:#fff; font-size:0.9375em; font-weight:bold; margin-bottom:0.222em; }
   .pp-btn {
-    width:140px; padding:8px 0; font-size:14px; font-weight:bold;
-    border:none; border-radius:9px; cursor:pointer; color:#fff;
-    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 3px 0 rgba(0,0,0,.35);
+    width:10em; padding:0.571em 0; font-size:0.729em; font-weight:bold;
+    border:none; border-radius:0.643em; cursor:pointer; color:#fff;
+    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 0.214em 0 rgba(0,0,0,.35);
   }
-  .pp-btn:active { transform:translateY(2px); box-shadow:none; }
+  .pp-btn:active { transform:translateY(0.143em); box-shadow:none; }
   #ppResume { background:#4CAF50; }
   #ppRestart { background:#FFB020; color:#5B3A00; }
   #ppMenu { background:#2196F3; }
@@ -125,36 +125,36 @@
   /* 成就界面（点右下角 🎖️ 打开：隐藏主菜单、全画布页面、列表可滚动） */
   #achievePanel {
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    display:none; flex-direction:column; align-items:center; gap:10px;
-    background:rgba(16,16,28,.92); border:2px solid rgba(255,255,255,.18);
-    border-radius:16px; padding:12px 18px; z-index:36;      /* 尺寸由 resize() 跟随画布 */
+    display:none; flex-direction:column; align-items:center; gap:0.625em;
+    background:rgba(16,16,28,.92); border:0.125em solid rgba(255,255,255,.18);
+    border-radius:1em; padding:0.75em 1.125em; z-index:36;      /* 尺寸由 resize() 跟随画布 */
     font-family:"Microsoft YaHei",sans-serif;
   }
   #achievePanel.show { display:flex; }
-  #acTitle { color:#FFB020; font-size:14px; font-weight:bold; margin-top:-4px; }  /* 缩小并上移 */
+  #acTitle { color:#FFB020; font-size:0.875em; font-weight:bold; margin-top:-0.286em; }  /* 缩小并上移 */
   #acList {
     flex:1; width:100%; overflow-y:auto; overflow-x:hidden;
-    display:flex; flex-direction:column; gap:6px; padding-right:6px;
+    display:flex; flex-direction:column; gap:0.375em; padding-right:0.375em;
   }
-  #acList::-webkit-scrollbar { width:5px; }
-  #acList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:3px; }
+  #acList::-webkit-scrollbar { width:0.3125em; }
+  #acList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:0.1875em; }
   #acList::-webkit-scrollbar-track { background:transparent; }
   .ac-item {
-    display:flex; align-items:center; gap:8px; font-size:11px; color:#fff;
-    background:rgba(255,255,255,.06); border-radius:8px; padding:6px 10px;
+    display:flex; align-items:center; gap:0.727em; font-size:0.6875em; color:#fff;
+    background:rgba(255,255,255,.06); border-radius:0.727em; padding:0.545em 0.909em;
   }
   .ac-equip {
-    min-width:40px; padding:2px 6px; font-size:9px; font-weight:bold;
-    border:none; border-radius:6px; cursor:pointer; color:#fff;
+    min-width:4.444em; padding:0.222em 0.667em; font-size:0.5625em; font-weight:bold;
+    border:none; border-radius:0.667em; cursor:pointer; color:#fff;
     background:rgba(255,255,255,.16); font-family:"Microsoft YaHei",sans-serif;
   }
   .ac-equip:active { background:rgba(255,255,255,.3); }
   .ac-equip.on { background:#FFB020; color:#5B3A00; }
-  .ac-equip-ph { min-width:40px; }   /* 未解锁时占位，保持对齐 */
-  .ac-icon { font-size:16px; }
+  .ac-equip-ph { min-width:2.5em; }   /* 未解锁时占位，保持对齐 */
+  .ac-icon { font-size:1em; }
   .ac-name { font-weight:bold; white-space:nowrap; }
-  .ac-desc { color:rgba(255,255,255,.6); font-size:10px; white-space:nowrap; }
-  .ac-state { margin-left:auto; font-size:10px; white-space:nowrap; }
+  .ac-desc { color:rgba(255,255,255,.6); font-size:0.625em; white-space:nowrap; }
+  .ac-state { margin-left:auto; font-size:0.625em; white-space:nowrap; }
   .ac-locked { opacity:.45; }
   .lb-equip { position:absolute; left:0; top:50%; transform:translateY(-50%); }  /* 图标凸出在昵称左侧，不占昵称文本位 */
   /* 成就解锁通知（游戏画面上方滑入滑出） */
@@ -171,10 +171,10 @@
   .an-text { color:#FFD54A; font-size:14px; font-weight:bold; white-space:nowrap; }
   /* 成就界面右上角关闭 × */
   #acClose {
-    position:absolute; right:8px; top:8px;
-    width:26px; height:26px; border-radius:50%;
-    border:1px solid rgba(255,255,255,.32);
-    background:rgba(255,255,255,.12); color:#fff; font-size:14px;
+    position:absolute; right:0.571em; top:0.571em;
+    width:1.857em; height:1.857em; border-radius:50%;
+    border:0.071em solid rgba(255,255,255,.32);
+    background:rgba(255,255,255,.12); color:#fff; font-size:0.875em;
     cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
     display:flex; align-items:center; justify-content:center;
   }
@@ -202,41 +202,41 @@
   #authMenu {
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
     display:none; flex-direction:column; align-items:center; z-index:35;
-    background:rgba(16,16,28,.9); border:2px solid rgba(255,255,255,.2);
-    border-radius:18px; padding:24px 32px;
+    background:rgba(16,16,28,.9); border:0.104em solid rgba(255,255,255,.2);
+    border-radius:0.9375em; padding:1.25em 1.667em;
     font-family:"Microsoft YaHei",sans-serif;
   }
   #authHero { display:flex; flex-direction:column; align-items:center; }
-  #authTitle { color:#FFB020; font-size:34px; font-weight:bold; letter-spacing:10px; text-shadow:0 3px 0 rgba(0,0,0,.45); }
-  #authSub { color:#bbb; font-size:13px; margin:10px 0 22px; letter-spacing:1px; }
-  #authBtns { display:flex; gap:16px; }
+  #authTitle { color:#FFB020; font-size:1.771em; font-weight:bold; letter-spacing:0.294em; text-shadow:0 0.088em 0 rgba(0,0,0,.45); }
+  #authSub { color:#bbb; font-size:0.677em; margin:0.769em 0 1.692em; letter-spacing:0.077em; }
+  #authBtns { display:flex; gap:0.833em; }
   .auth-btn {
-    min-width:118px; padding:11px 0; font-size:16px; font-weight:bold;
-    border:none; border-radius:11px; cursor:pointer; color:#fff;
-    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 4px 0 rgba(0,0,0,.35);
+    min-width:7.375em; padding:0.6875em 0; font-size:0.833em; font-weight:bold;
+    border:none; border-radius:0.6875em; cursor:pointer; color:#fff;
+    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 0.25em 0 rgba(0,0,0,.35);
   }
-  .auth-btn:active { transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.35); }
+  .auth-btn:active { transform:translateY(0.1875em); box-shadow:0 0.0625em 0 rgba(0,0,0,.35); }
   #btnRegister { background:#4CAF50; }
   #btnLogin   { background:#2196F3; }
-  #authForm { display:none; flex-direction:column; align-items:center; gap:10px; width:250px; }
+  #authForm { display:none; flex-direction:column; align-items:center; gap:0.521em; width:13.02em; }
   #authForm.show { display:flex; }
-  #afTitle { color:#FFB020; font-size:18px; font-weight:bold; margin-bottom:2px; }
+  #afTitle { color:#FFB020; font-size:0.9375em; font-weight:bold; margin-bottom:0.111em; }
   #authForm input {
-    width:100%; padding:9px 12px; font-size:14px; border-radius:9px; color:#fff;
-    border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08);
+    width:100%; padding:0.643em 0.857em; font-size:0.729em; border-radius:0.643em; color:#fff;
+    border:0.071em solid rgba(255,255,255,.25); background:rgba(255,255,255,.08);
     outline:none; font-family:"Microsoft YaHei",sans-serif;
   }
   #authForm input::placeholder { color:rgba(255,255,255,.4); }
   #authForm input:focus { border-color:#FFB020; }
-  #afMsg { min-height:15px; font-size:12px; color:#FF8A80; text-align:center; }
+  #afMsg { min-height:1.25em; font-size:0.625em; color:#FF8A80; text-align:center; }
   #afMsg.ok { color:#81C784; }
-  #afBtns { display:flex; gap:12px; margin-top:2px; }
+  #afBtns { display:flex; gap:0.625em; margin-top:0.104em; }
   .auth-btn-sm {
-    width:96px; padding:8px 0; font-size:14px; font-weight:bold;
-    border:none; border-radius:9px; cursor:pointer; color:#fff;
-    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 3px 0 rgba(0,0,0,.35);
+    width:6.857em; padding:0.571em 0; font-size:0.729em; font-weight:bold;
+    border:none; border-radius:0.643em; cursor:pointer; color:#fff;
+    font-family:"Microsoft YaHei",sans-serif; box-shadow:0 0.214em 0 rgba(0,0,0,.35);
   }
-  .auth-btn-sm:active { transform:translateY(2px); box-shadow:none; }
+  .auth-btn-sm:active { transform:translateY(0.143em); box-shadow:none; }
   #afSubmit { background:#FFB020; color:#5B3A00; }
   #afBack { background:rgba(255,255,255,.18); }
 </style>
@@ -490,7 +490,21 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => {
   if (e.code==='ArrowDown'||e.code==='KeyS') releaseDuck();
 });
-canvas.addEventListener('pointerdown', e => { e.preventDefault(); pressJump(); });
+let touchDuck = false;                        // 触屏左半区按住蹲标志
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const isTouch = e.pointerType !== 'mouse';
+  if (isTouch && state === 'playing'){        // 手机版：左半蹲 / 右半跳（点设置按钮不命中画布，自动排除）
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < rect.width / 2){ touchDuck = true; pressDuck(); return; }
+  }
+  pressJump();
+});
+function releaseTouchDuck(){ if (touchDuck){ touchDuck = false; releaseDuck(); } }
+canvas.addEventListener('pointerup', releaseTouchDuck);
+canvas.addEventListener('pointercancel', releaseTouchDuck);
+canvas.addEventListener('pointerleave', releaseTouchDuck);
 const btnJump = document.getElementById('btnJump'), btnDuck = document.getElementById('btnDuck');
 btnJump.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pressJump(); });
 btnDuck .addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pressDuck(); });
@@ -1043,15 +1057,18 @@ function resize(){
     if (cw > 0 && ch > 0){
       mm.style.width  = Math.round(cw*0.9) + 'px';
       mm.style.height = Math.round(ch) + 'px';
-      // 主菜单整体缩放基准：画布宽 800 → 16px；等比放大字号（限 10~40px 防极端）
-      mm.style.fontSize = Math.max(10, Math.min(40, 16 * cw / 800)) + 'px';
+      // 主菜单整体缩放基准：画布宽 800 → 19.2px（×1.2）；等比放大字号（限 10~48px 防极端）
+      mm.style.fontSize = Math.max(10, Math.min(48, 19.2 * cw / 800)) + 'px';
     }
   }
-  // 开始界面宽度跟随画布（高度自适应内容）
+  // 开始界面宽度跟随画布（高度自适应内容）+ 基准字号（同主菜单规格 19.2px @800）
   const am = document.getElementById('authMenu');
   if (am){
     const cw = parseFloat(canvas.style.width);
-    if (cw > 0) am.style.width = Math.round(cw*0.56) + 'px';
+    if (cw > 0){
+      am.style.width = Math.round(cw*0.56) + 'px';
+      am.style.fontSize = Math.max(10, Math.min(48, 19.2 * cw / 800)) + 'px';
+    }
   }
   // 成就界面尺寸跟随画布（宽 90%、高 100%，与主菜单同规格）
   const ap = document.getElementById('achievePanel');
@@ -1060,7 +1077,15 @@ function resize(){
     if (cw > 0 && ch > 0){
       ap.style.width  = Math.round(cw*0.9) + 'px';
       ap.style.height = Math.round(ch) + 'px';
+      // 成就面板整体缩放基准（比主菜单大 1.6 倍：画布宽 800 → 25.6px，10~64px）
+      ap.style.fontSize = Math.max(10, Math.min(64, 25.6 * cw / 800)) + 'px';
     }
+  }
+  // 设置（暂停）面板缩放基准（与主菜单同规格：画布宽 800 → 19.2px，10~48px）
+  const pp = document.getElementById('pausePanel');
+  if (pp){
+    const cw = parseFloat(canvas.style.width);
+    if (cw > 0) pp.style.fontSize = Math.max(10, Math.min(48, 19.2 * cw / 800)) + 'px';
   }
   // 设置按钮：横屏跟随画布右上角；竖屏由 JS 贴画布视觉右上角（stage 旋转 90°：画面左上 → 视觉右上）
   if (!portrait){
