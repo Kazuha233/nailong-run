@@ -31,7 +31,8 @@
   .btn:active { background:rgba(255,255,255,.38); }
   #btnJump { right:22px; }  /* 跳 → 右下（顺手） */
   #btnDuck  { left:22px; }  /* 蹲 → 左下 */
-  /* 手机版已改为点画面左半蹲/右半跳（不再显示跳蹲按钮） */
+  /* 手机版操作模式：上下分区（默认）不显示跳蹲按钮；经典按键模式（body.op-buttons）触屏显示 */
+  @media (pointer:coarse) { body.op-buttons .btn { display:flex; } }
   #btnRestart {
     position:absolute; left:50%; top:84%; transform:translate(-50%,-50%);
     display:none; padding:10px 32px; font-size:18px; font-weight:bold;
@@ -90,7 +91,7 @@
   #mmNormal { background:#4CAF50; }
   #mmExtreme { background:#E8590C; }
   .lb-title { color:#FFB020; font-size:0.71em; font-weight:bold; text-align:center; margin-bottom:0.4em; }
-  #lbList { flex:1; overflow-y:auto; overflow-x:hidden; color:#ddd; font-size:0.57em; line-height:1.9; padding-bottom:3.75em; }  /* 可滚动；底部留白防右下角成就按钮遮挡 */
+  #lbList { flex:1; overflow-y:auto; overflow-x:hidden; color:#ddd; font-size:0.57em; line-height:1.9; padding-bottom:3.75em; -webkit-overflow-scrolling:touch; }  /* 底部小留白；遮挡由成就按钮不透明底色兜底 */
   #lbList::-webkit-scrollbar { width:0.625em; }
   #lbList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:0.375em; }
   #lbList::-webkit-scrollbar-track { background:transparent; }
@@ -112,11 +113,21 @@
     z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
   }
   #btnLogout:active { background:rgba(255,255,255,.38); }
+  /* 主菜单左下角：操作设置（退出登录右边；圆角矩形小按钮同成就按钮风格） */
+  #btnOpSettings {
+    position:absolute; left:3em; bottom:0.5em;
+    padding:0.2em 0.7em; font-size:0.71em; font-weight:bold;
+    background:rgba(255,255,255,.16); color:#fff;
+    border:0.1em solid rgba(255,255,255,.32);
+    border-radius:0.7em; display:flex; align-items:center; justify-content:center;
+    gap:0.14em; z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
+  }
+  #btnOpSettings:active { background:rgba(255,255,255,.38); }
   /* 主菜单右下角：成就系统（圆角矩形小按钮：图标 + 文字，小号防挡榜单） */
   #btnAchieve {
     position:absolute; right:0.8em; bottom:0.8em;
     padding:0.2em 0.7em; font-size:0.71em; font-weight:bold;
-    background:rgba(255,255,255,.16); color:#fff;
+    background:#2A2A3E; color:#fff;                 /* 不透明深色底色：内容滚到下方也不透 */
     border:0.1em solid rgba(255,255,255,.32);
     border-radius:0.7em; display:flex; align-items:center; justify-content:center;
     gap:0.2em; z-index:31; cursor:pointer; font-family:"Microsoft YaHei",sans-serif;
@@ -135,6 +146,7 @@
   #acList {
     flex:1; width:100%; overflow-y:auto; overflow-x:hidden;
     display:flex; flex-direction:column; gap:0.375em; padding-right:0.375em;
+    -webkit-overflow-scrolling:touch;   /* 滚动平滑；触摸用 pointer 手动拖拽（enableDragScroll） */
   }
   #acList::-webkit-scrollbar { width:0.3125em; }
   #acList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:0.1875em; }
@@ -198,6 +210,32 @@
   .cf-btn:active { transform:translateY(2px); box-shadow:none; }
   #cfYes { background:#E8590C; }
   #cfNo  { background:rgba(255,255,255,.18); }
+  /* 操作设置面板（主菜单左下角 🎮 打开：选择上下分区 / 经典按键） */
+  #opPanel {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    display:none; flex-direction:column; align-items:center; gap:0.857em;
+    background:rgba(16,16,28,.92); border:0.143em solid rgba(255,255,255,.18);
+    border-radius:1em; padding:1.143em 1.714em; z-index:38;
+    font-family:"Microsoft YaHei",sans-serif;
+  }
+  #opPanel.show { display:flex; }
+  #opTitle { color:#FFB020; font-size:1.071em; font-weight:bold; }
+  #opModes { display:flex; flex-direction:column; gap:0.571em; }
+  .op-mode {
+    width:14em; padding:0.571em 0.857em; font-size:0.857em; font-weight:bold;
+    border:0.143em solid rgba(255,255,255,.25); border-radius:0.643em; cursor:pointer;
+    background:rgba(255,255,255,.08); color:#fff; text-align:center;
+    font-family:"Microsoft YaHei",sans-serif;
+  }
+  .op-mode .op-desc { display:block; font-size:0.75em; font-weight:normal; color:rgba(255,255,255,.6); margin-top:0.2em; }
+  .op-mode.on { border-color:#FFB020; background:rgba(255,176,32,.22); color:#FFD54A; }
+  #opClose {
+    width:8em; padding:0.571em 0; font-size:0.857em; font-weight:bold;
+    border:none; border-radius:0.643em; cursor:pointer; color:#fff;
+    background:rgba(255,255,255,.18); font-family:"Microsoft YaHei",sans-serif;
+    box-shadow:0 0.214em 0 rgba(0,0,0,.35);
+  }
+  #opClose:active { transform:translateY(0.143em); box-shadow:none; }
   /* 开始界面（注册/登录）：在主菜单之前，游戏画布风格 */
   #authMenu {
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -288,6 +326,7 @@
       <div id="lbList">⏳ 接入中…</div>
     </div>
     <button id="btnLogout" title="退出登录">🚪</button>
+    <button id="btnOpSettings" title="操作设置">🎮 操作设置</button>
     <button id="btnAchieve" title="成就系统">🎖️ 成就</button>
   </div>
   <!-- 成就系统面板 -->
@@ -308,6 +347,15 @@
       <button id="cfYes" class="cf-btn">确认退出</button>
       <button id="cfNo" class="cf-btn">取消</button>
     </div>
+  </div>
+  <!-- 操作设置面板 -->
+  <div id="opPanel">
+    <div id="opTitle">🎮 操作设置</div>
+    <div id="opModes">
+      <button id="opSplit" class="op-mode">🖐️ 上下分区<span class="op-desc">屏幕上半跳 · 下半蹲</span></button>
+      <button id="opButtons" class="op-mode">🔘 经典按键<span class="op-desc">屏幕左下蹲 · 右下跳</span></button>
+    </div>
+    <button id="opClose">完成</button>
   </div>
   <div class="btn" id="btnJump">跳</div>
   <div class="btn" id="btnDuck">蹲</div>
@@ -494,8 +542,8 @@ let touchDuck = false;                        // 触屏左半区按住蹲标志
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   const isTouch = e.pointerType !== 'mouse';
-  // 手机版（微信竖屏锁定会旋转画面）：用视口坐标分左右——视觉左半=蹲、右半=跳（与旋转解耦）
-  if (isTouch && state === 'playing'){
+  // 手机版（微信竖屏锁定会旋转画面）：用视口坐标分左右——视觉左半=蹲、右半=跳（与旋转解耦；仅上下分区模式，逻辑不动）
+  if (isTouch && state === 'playing' && loadOpMode() === 'split'){
     if (e.clientX < window.innerWidth / 2){ touchDuck = true; pressDuck(); return; }
   }
   pressJump();
@@ -678,6 +726,34 @@ document.getElementById('btnLogout').addEventListener('pointerdown', e => {
   e.stopPropagation(); e.preventDefault();
   document.getElementById('confirmPanel').classList.add('show');
 });
+// ============ 操作设置：上下分区（默认）| 经典按键 ============
+function loadOpMode(){ try { return localStorage.getItem('nlOpMode') || 'split'; } catch(e){ return 'split'; } }
+function saveOpMode(m){ try { localStorage.setItem('nlOpMode', m); } catch(e){} }
+function applyOpMode(){
+  const m = loadOpMode();
+  document.body.classList.toggle('op-buttons', m === 'buttons');   // 经典按键模式：触屏显示跳蹲按钮
+  const s = document.getElementById('opSplit'), b = document.getElementById('opButtons');
+  if (s) s.classList.toggle('on', m === 'split');
+  if (b) b.classList.toggle('on', m === 'buttons');
+}
+document.getElementById('btnOpSettings').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  applyOpMode();
+  document.getElementById('opPanel').classList.add('show');
+});
+document.getElementById('opSplit').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  saveOpMode('split'); applyOpMode();
+});
+document.getElementById('opButtons').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  saveOpMode('buttons'); applyOpMode();
+});
+document.getElementById('opClose').addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault();
+  document.getElementById('opPanel').classList.remove('show');
+});
+applyOpMode();   // 页面加载即应用偏好
 // ============ 成就系统（基于本地最高分自动解锁） ============
 const ACHIEVEMENTS = [
   { key:'summit',     icon:'🏔️', name:'抵达雪峰', desc:'任意模式到达终点',                need: v => v >= 9999 },
@@ -832,11 +908,10 @@ document.getElementById('acClose').addEventListener('pointerdown', e => {
   document.getElementById('mainMenu').style.display = 'flex';     // 返回主菜单
   loadBoard();                                                     // 刷新榜单（佩戴变更后拉最新）
 });
-// 鼠标按住列表直接拖动滚动（触摸走原生滑动；桌面预览窗/WebView 鼠标可用）
+// 鼠标/触摸按住列表直接拖动滚动（统一手动拖拽，不依赖浏览器原生滚动——微信 X5/WKWebView 原生滚动差异大）
 function enableDragScroll(el){
   let down = false, startY = 0, startTop = 0;
   el.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'mouse') return;          // 触摸/触屏笔用原生滚动
     down = true; startY = e.clientY; startTop = el.scrollTop;
     el.style.cursor = 'grabbing';
     try { el.setPointerCapture(e.pointerId); } catch(err){}
@@ -876,7 +951,7 @@ function fmtLbTime(iso){
 }
 async function loadBoard(){
   try {
-    const res = await supabaseFetch('leaderboard?select=nickname,score,created_at,equip&order=score.desc,created_at.asc&limit=20');
+    const res = await supabaseFetch('leaderboard?select=nickname,score,created_at,equip&order=score.desc,created_at.asc&limit=25');
     if (!res.ok) return;                       // 表未建/网络异常：保留占位「⏳ 接入中…」
     lbData = await res.json();
     if (loggedUser){                           // 以服务器佩戴状态同步本地（跨设备一致）
