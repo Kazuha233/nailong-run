@@ -494,10 +494,9 @@ let touchDuck = false;                        // 触屏左半区按住蹲标志
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   const isTouch = e.pointerType !== 'mouse';
-  if (isTouch && state === 'playing'){        // 手机版：左半蹲 / 右半跳（点设置按钮不命中画布，自动排除）
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x < rect.width / 2){ touchDuck = true; pressDuck(); return; }
+  // 手机版（微信竖屏锁定会旋转画面）：用视口坐标分左右——视觉左半=蹲、右半=跳（与旋转解耦）
+  if (isTouch && state === 'playing'){
+    if (e.clientX < window.innerWidth / 2){ touchDuck = true; pressDuck(); return; }
   }
   pressJump();
 });
@@ -1097,11 +1096,10 @@ function resize(){
       btnSettings.style.bottom = 'auto';
     }
   } else {
-    // 竖屏：stage 本地宽 = 100vh、高 = 100vw；画布垂直居中 → 画布本地左上 = (0, (innerWidth-ch)/2)
-    // 旋转后该点 = 视觉右上角（画布视觉右上角）
+    // 竖屏（微信锁定）：按钮放画布本地右上 → 旋转后 = 视口右下 → 主人横看横板画面时 = 画面右上角
     const cw = parseFloat(canvas.style.width), ch = parseFloat(canvas.style.height);
     if (cw > 0 && ch > 0){
-      btnSettings.style.left   = '3px';
+      btnSettings.style.left   = Math.round(cw - 33) + 'px';
       btnSettings.style.top    = Math.round((innerWidth - ch)/2 + 3) + 'px';
       btnSettings.style.right  = 'auto';
       btnSettings.style.bottom = 'auto';
