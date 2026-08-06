@@ -572,7 +572,7 @@ btnRestart.addEventListener('pointerdown', e => {
 // ---------- 开始游戏（统一入口） ----------
 function startGame(){
   state = 'playing'; sfx.start();
-  bgm.currentTime = 0; bgm.play().catch(function(){});
+  bgm.currentTime = 0; tryPlayBgm(true);   // 手势内播放；未就绪自动补播
   btnSettings.style.display = 'flex';
   document.getElementById('mainMenu').style.display = 'none';
 }
@@ -1088,7 +1088,7 @@ document.getElementById('ppResume').addEventListener('pointerdown', e => {
   e.stopPropagation(); e.preventDefault();
   if (state !== 'paused') return;
   state = 'playing';
-  bgm.play().catch(function(){});
+  tryPlayBgm(false);                     // 暂停继续：不重置进度
   pausePanel.classList.remove('show');
   btnSettings.style.display = 'flex';
 });
@@ -1297,6 +1297,19 @@ const bgm = new Audio('assets/bgm.mp3');
 bgm.preload = 'auto';
 let bgmBroken = false;                 // 音频故障标记：BGM 提前 ended / error → 进度降级为距离估算
 const DIST_TOTAL = 2330;               // 全程总距离（203s BGM × 速度公式推导：D(t)=1680*(e^(t/233.33)-1)）
+// 播放兜底：iOS 上超时进入游戏时 BGM 可能未就绪（手势已解锁加载）→ 失败则 load + 就绪后自动补播
+function tryPlayBgm(resetTime){
+  if (resetTime) bgm.currentTime = 0;
+  bgm.play().catch(function(){
+    if (bgm.readyState < 3){          // 未缓冲够数据：显式加载，就绪后补播
+      bgm.load();
+      bgm.addEventListener('canplaythrough', function(){
+        if (resetTime) bgm.currentTime = 0;
+        bgm.play().catch(function(){});
+      }, { once:true });
+    }
+  });
+}
 // canplaythrough：整首下载完才就绪（防边播边下卡顿；BGM 已压 128k/3.1MB，等待可接受）
 bgm.addEventListener('canplaythrough', function(){ markLoaded(); checkPreload(); });
 bgm.addEventListener('error', function(){
