@@ -41,9 +41,29 @@ create policy "insert_valid" on leaderboard for insert
   with check (score between 0 and 9999 and nickname is not null
               and char_length(nickname) between 1 and 12);
 
--- ---------- 3. 榜单 RPC：一人一条只留最高分，覆盖时刷新时间戳（同分越早越前） ----------
-create or replace function upsert_leaderboard(p_nickname text, p_score int)
+-- ---------- 3. score_log 表（每次提交历史：分数合理性校验依据） ----------
+create table if not exists score_log (
+  id bigint generated always as identity primary key,
+  nickname text not null,
+  score int not null,
+  created_at timestamptz default now()
+);
+alter table score_log enable row level security;
+drop policy if exists "insert_log" on score_log;
+drop policy if exists "read_log" on score_log;
+create policy "insert_log" on score_log for insert with check (true);
+create policy "read_log" on score_log for select using (true);
+
+-- ---------- 4. 榜单 RPC（防作弊版）：一人一条只留最高分，覆盖时刷新时间戳（同分越早越前） ----------
+-- p_elapsed = 本局游戏时长（秒）；校验1: 时长-分数匹配（正常≈elapsed/203×9999，容差25%）；
+-- 校验2: 距上次提交过短且涨幅过大 → 拒绝（外挂瞬间通关 elapsed≈0 → 9999 上不了榜）
+create or replace function upsert_leaderboard(p_nickname text, p_score int, p_elapsed int default 0)
 returns text as $$
+declare
+  last_ts timestamptz;
+  last_score int;
+  dt_sec float;
+  expected float;
 begin
   if p_nickname is null or char_length(p_nickname) < 1 or char_length(p_nickname) > 12 then
     raise exception 'invalid nickname';
@@ -51,13 +71,36 @@ begin
   if p_score < 0 or p_score > 9999 then
     raise exception 'invalid score';
   end if;
+
+  insert into score_log (nickname, score) values (p_nickname, p_score);
+
+  if p_elapsed > 0 and p_score > 1000 then
+    expected := (p_elapsed::float / 203.0) * 9999.0;
+    if p_score > expected * 1.25 then
+      raise exception 'suspicious score';
+    end if;
+  end if;
+
+  select created_at, score into last_ts, last_score
+  from score_log where nickname = p_nickname
+  order by created_at desc limit 1 offset 1;
+  if last_ts is not null then
+    dt_sec := extract(epoch from (now() - last_ts));
+    if p_score > 9900 and dt_sec < 120 then
+      raise exception 'suspicious score';
+    end if;
+    if p_score - last_score > 3000 and dt_sec < 30 then
+      raise exception 'suspicious score';
+    end if;
+  end if;
+
   insert into leaderboard (nickname, score) values (p_nickname, p_score)
   on conflict (nickname) do update set score = excluded.score, created_at = now()
   where leaderboard.score < excluded.score;
   return 'ok';
 end $$ language plpgsql security definer;
 
--- ---------- 4. 佩戴 RPC：白名单校验（8 成就 key） ----------
+-- ---------- 5. 佩戴 RPC：白名单校验（8 成就 key） ----------
 create or replace function update_equip(p_nickname text, p_equip text)
 returns text as $$
 begin
@@ -71,7 +114,7 @@ begin
   return 'ok';
 end $$ language plpgsql security definer;
 
--- ---------- 5. 成就同步 RPC：白名单校验（8 成就 key，布尔值） ----------
+-- ---------- 6. 成就同步 RPC：白名单校验（8 成就 key，布尔值） ----------
 create or replace function sync_achievements(p_nickname text, p_ach jsonb)
 returns text as $$
 declare

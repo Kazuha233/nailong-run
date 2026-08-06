@@ -388,16 +388,16 @@ let stormTimer = 6;                    // 下次闪电倒计时（秒）
 let stormActive = false;               // 雷暴进行中
 let stormNext = 12;                    // 下次雷暴倒计时（秒）
 let stormDur = 0;                      // 本次雷暴剩余时间（秒）
-let snowMix = 0;                       // 雪天强度（平滑渐变）
+let sn_mx = 0;                       // 雪天强度（平滑渐变）
 let snowActive = false;                // 雪天进行中
 let snowNext = 25;                     // 下次雪天倒计时（秒）
 let snowDur = 0;                       // 本次雪天剩余时间（秒）
 let snowHint = 0;                      // 下雪提示倒计时
 let snowDepth = 0;                     // 积雪深度（雪下了一会儿才开始积，0~1）
 let snowElapsed = 0;                   // 本次雪天已持续秒数
-let jumpQueued = false, jumpDelay = 0; // 雪天地滑：起跳延迟
-let thornLevel = 0;                    // 荆棘缠身层数（0~3，每撞一次 +1，每层减速递增）
-let thornClears = 0;                   // 已点蹲次数（每满 2 次去掉一层）
+let j_q = false, j_dl = 0; // 雪天地滑：起跳延迟
+let th_lv = 0;                    // 荆棘缠身层数（0~3，每撞一次 +1，每层减速递增）
+let th_cl = 0;                   // 已点蹲次数（每满 2 次去掉一层）
 let thornHint = 0;                     // 荆棘提示倒计时
 const THORN_CLEAR_NEED = 2;            // 每层需连续点击下蹲 2 次去除
 const snowParticles = [];              // 雪粒子（飘雪）
@@ -419,10 +419,10 @@ const dno = {
   onGround: true, animT: 0
 };
 
-let ob_lst = [], fishes = [];
+let ob_lst = [], f_sh = [];
 
 // 破碎碎片 + 保命无敌 + 护体提示
-let shards = [];
+let sh_d = [];
 let in_v = 0;
 let shieldHint = 0;
 let zoom = 1;            // 镜头缩放（临近终点时逐渐拉远）
@@ -505,10 +505,10 @@ function pressJump(){
   if (state === 'loading' || state === 'paused') return;   // 资源未就绪 / 暂停中，忽略点击
   if (state === 'ready')   { return; }                      // 开始界面/主菜单：点画布不启动（只走主菜单模式按钮）
   if (dno.mode === 'duck'){ dno.mode='run'; }    // 蹲着按跳：先站起再跳
-  if (thornLevel > 0) return;                       // 荆棘缠身：无法跳跃
+  if (th_lv > 0) return;                       // 荆棘缠身：无法跳跃
   if (dno.onGround){
-    if (snowMix > 0.3){                       // 雪天地滑：起跳延迟一小会
-      jumpQueued = true; jumpDelay = 0.1;
+    if (sn_mx > 0.3){                       // 雪天地滑：起跳延迟一小会
+      j_q = true; j_dl = 0.1;
     } else {
       dno.vy = -10; dno.mode='jump'; dno.onGround=false; sfx.jump();
     }
@@ -517,11 +517,11 @@ function pressJump(){
 function pressDuck(){
   initAudio();
   if (state !== 'playing') return;
-  if (thornLevel > 0){                        // 荆棘缠身：连续点击下蹲挣脱（每 3 次去掉一层）
-    thornClears++;
-    if (thornClears >= THORN_CLEAR_NEED){
-      thornClears = 0;
-      thornLevel--;                           // 去掉一层（层数递减，覆盖减少）
+  if (th_lv > 0){                        // 荆棘缠身：连续点击下蹲挣脱（每 3 次去掉一层）
+    th_cl++;
+    if (th_cl >= THORN_CLEAR_NEED){
+      th_cl = 0;
+      th_lv--;                           // 去掉一层（层数递减，覆盖减少）
       sfx.fish();
     }
   }
@@ -1216,7 +1216,7 @@ resize();
 
 // ---------- 重置 ----------
 function reset(){
-  ob_lst = []; fishes = []; shards = [];
+  ob_lst = []; f_sh = []; sh_d = [];
   scoreSubmitted = false;                  // 新一局可重新提交成绩
   heliBreakCount = 0;                      // 单局护体撞碎直升机计数清零
   crocHitCount = 0;                        // 单局撞击鳄鱼计数清零
@@ -1226,10 +1226,10 @@ function reset(){
   in_v = 0; shieldHint = 0; zoom = 1;
   stormMix = 0; stormFlash = 0; stormTimer = 6;
   stormActive = false; stormNext = 12; stormDur = 0;
-  snowMix = 0; snowActive = false; snowNext = 22; snowDur = 0; snowHint = 0;
+  sn_mx = 0; snowActive = false; snowNext = 22; snowDur = 0; snowHint = 0;
   snowDepth = 0; snowElapsed = 0;
-  jumpQueued = false; jumpDelay = 0;
-  thornLevel = 0; thornClears = 0; thornHint = 0;
+  j_q = false; j_dl = 0;
+  th_lv = 0; th_cl = 0; thornHint = 0;
   thornScore = 0; thornScoreBase = 0;
   bgmBroken = false;                       // 新一局恢复 BGM 计时
   bgm.currentTime = 0; bgm.pause();
@@ -1244,7 +1244,7 @@ function spawnShards(o){
   const n = isHeli ? 34 : 10;                      // 直升机碎裂粒子增多（16→34 片）
   for (let i=0;i<n;i++){
     const big = isHeli && i < 8;                   // 前 8 片大块（机身残骸）
-    shards.push({
+    sh_d.push({
       x: o.x + (Math.random()-0.5)*o.w,
       y: o.y - Math.random()*o.h,
       vx: (Math.random()-0.35)*7,
@@ -1383,19 +1383,20 @@ function spawnObstacle(){
 }
 
 // ---------- 主更新 ----------
-function update(dt){
+// 游戏主循环核心（内部化：不让外挂脚本通过包装全局 update 劫持游戏）
+const _cu = function(dt){
   if (state !== 'playing') return;
   const k = dt*60;                                  // 归一化到 60fps 基准
   // 雪天机制：空中时场景减速（落地恢复）；荆棘缠身每层减速（1层0.82/2层0.64/3层0.46）
-  const snowAirSlow = (snowMix > 0.3 && !dno.onGround) ? 0.72 : 1;
-  const thornSlow = thornLevel > 0 ? (1 - 0.18*thornLevel) : 1;
+  const snowAirSlow = (sn_mx > 0.3 && !dno.onGround) ? 0.72 : 1;
+  const thornSlow = th_lv > 0 ? (1 - 0.18*th_lv) : 1;
   const sceneK = k * snowAirSlow * thornSlow;
   // 雪天地滑：起跳延迟（到点且仍在地面则起跳）
-  if (jumpQueued){
-    jumpDelay -= dt;
-    if (jumpDelay <= 0){
-      jumpQueued = false;
-      if (dno.onGround && state === 'playing' && thornLevel <= 0){
+  if (j_q){
+    j_dl -= dt;
+    if (j_dl <= 0){
+      j_q = false;
+      if (dno.onGround && state === 'playing' && th_lv <= 0){
         dno.vy = -10; dno.mode='jump'; dno.onGround=false; sfx.jump();
       }
     }
@@ -1502,7 +1503,7 @@ function update(dt){
     snowNext = 22;
   }
   const snowTarget = (!ending && snowActive) ? 1 : 0;
-  snowMix += (snowTarget - snowMix) * Math.min(1, dt*0.8);
+  sn_mx += (snowTarget - sn_mx) * Math.min(1, dt*0.8);
   // 积雪深度：雪下 4 秒后才开始积雪，8 秒内积到满；雪停后缓慢消融
   if (snowActive){
     const snowGrow = snowElapsed > 4 ? Math.min(1, (snowElapsed-4)/8) : 0;
@@ -1512,7 +1513,7 @@ function update(dt){
   }
   if (snowHint > 0) snowHint -= dt;
   if (thornHint > 0) thornHint -= dt;   // 荆棘提示淡出（缠身播报后自动消失）
-  // 雪粒子更新（常驻，绘制时按 snowMix 透明度显示）
+  // 雪粒子更新（常驻，绘制时按 sn_mx 透明度显示）
   const stime = performance.now()/1000;
   for (const p of snowParticles){
     p.x += (p.vx + Math.sin(stime*1.3 + p.ph)*0.4) * k;
@@ -1540,8 +1541,8 @@ function update(dt){
     }
   }
   ob_lst = ob_lst.filter(o => o.x > -60);
-  for (const f of fishes) f.x -= spd*sceneK;
-  fishes = fishes.filter(f => f.x > -40);
+  for (const f of f_sh) f.x -= spd*sceneK;
+  f_sh = f_sh.filter(f => f.x > -40);
 
   // 生成节奏（接近终点 ending 时停止生成障碍/奶鱼，专心冲刺）
   if (!ending){
@@ -1549,7 +1550,7 @@ function update(dt){
     if (spawnDist <= 0){
       spawnObstacle();
       // 奶鱼高度随机（地面以上 68~98px，跳跃可及），出现频率 8.3%（25%÷3，保命道具更稀有）
-      if (Math.random() < 0.25/3) fishes.push({ x:VW+180, y:GROUND_Y-(68+Math.random()*30), w:20, h:13 });
+      if (Math.random() < 0.25/3) f_sh.push({ x:VW+180, y:GROUND_Y-(68+Math.random()*30), w:20, h:13 });
       // 障碍间隔分段随机（打破均匀）：30% 密集段 / 50% 普通段 / 20% 稀疏段
       // 后四分之一段（progress>0.75，速度触顶）间距整体加大，避免连跳不及
       const distR = Math.random();
@@ -1579,7 +1580,7 @@ function update(dt){
         }
         if (o.type === 'bramble'){
           // 荆棘缠身：不会死，每撞 +1 层（最多 3 层，减速递增），需连续点蹲每 3 次去除一层
-          if (thornLevel < 3) thornLevel++;
+          if (th_lv < 3) th_lv++;
           thornHint = 2.5;
           sfx.fish();
           ob_lst.splice(i,1);
@@ -1605,15 +1606,15 @@ function update(dt){
       }
     }
   }
-  for (let i=fishes.length-1;i>=0;i--){
-    const f = fishes[i];
+  for (let i=f_sh.length-1;i>=0;i--){
+    const f = f_sh[i];
     if (dbox.x1<f.x+9 && dbox.x2>f.x-9 && dbox.y1<f.y+6.5 && dbox.y2>f.y-6.5){
-      fishes.splice(i,1); f_cnt++; sfx.fish();   // 奶鱼：保命+计数（不再加分，保证终点正好9999）
+      f_sh.splice(i,1); f_cnt++; sfx.fish();   // 奶鱼：保命+计数（不再加分，保证终点正好9999）
     }
   }
   // 碎片物理（重力 + 摩擦 + 旋转）
   // 荆棘行者累积：缠身期间连续前进 2500 分（荆棘解除则重新计数）
-  if (thornLevel > 0){
+  if (th_lv > 0){
     thornScore += s_core - thornScoreBase;
     thornScoreBase = s_core;
     if (thornScore >= 2500) unlockAchievement('thornWalker', true);
@@ -1621,10 +1622,10 @@ function update(dt){
     thornScore = 0;
     thornScoreBase = s_core;
   }
-  for (let i=shards.length-1;i>=0;i--){
-    const s = shards[i];
+  for (let i=sh_d.length-1;i>=0;i--){
+    const s = sh_d[i];
     s.life -= dt;
-    if (s.life <= 0){ shards.splice(i,1); continue; }
+    if (s.life <= 0){ sh_d.splice(i,1); continue; }
     s.vy += 0.5 * k;
     s.x += s.vx * k;
     s.y += s.vy * k;
@@ -1861,9 +1862,9 @@ function drawRock(x, y, w, h){
     ctx.lineTo(x-w/8, y-h);
     ctx.closePath(); ctx.fill();
     // 底部积雪（石头脚边雪堆）
-    ctx.fillStyle = 'rgba(240,248,255,' + (0.5 + 0.4*snowMix) + ')';
+    ctx.fillStyle = 'rgba(240,248,255,' + (0.5 + 0.4*sn_mx) + ')';
     ctx.beginPath();
-    ctx.ellipse(x, y+2, w*0.5, 2 + 2*snowMix, 0, 0, Math.PI*2);
+    ctx.ellipse(x, y+2, w*0.5, 2 + 2*sn_mx, 0, 0, Math.PI*2);
     ctx.fill();
   }
   // 底部阴影
@@ -1915,7 +1916,7 @@ function drawBramble(x, y, w, h){
 }
 // ---------- 绘制：奶龙身上荆棘（缠身视觉，按层数叠加覆盖递增） ----------
 function drawThornOnDino(){
-  const L = thornLevel;
+  const L = th_lv;
   if (L <= 0) return;
   // 跟随奶龙身体的上下浮动（bob 与 drawDino 一致）
   const bob = (dno.mode === 'run' && dno.onGround) ? Math.sin(performance.now()/1000*13)*3.2 : 0;
@@ -2114,8 +2115,8 @@ function drawRain(t){
 
 // ---------- 绘制：飘雪（雪天粒子，前景） ----------
 function drawSnow(){
-  if (snowMix <= 0.02) return;
-  ctx.fillStyle = 'rgba(255,255,255,' + (0.75*snowMix) + ')';
+  if (sn_mx <= 0.02) return;
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.75*sn_mx) + ')';
   for (const p of snowParticles){
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
@@ -2174,9 +2175,9 @@ function drawBackground(t){
   ctx.fillStyle = lineCol;
   ctx.fillRect(0, GROUND_Y, VW, 2);
   // 积雪层（下雪时地表表面覆盖一层雪，随雪量变厚/变实）
-  if (snowMix > 0.02){
-    const snowH = 3 + 9*snowMix;                               // 雪层厚度 3~12px
-    ctx.fillStyle = 'rgba(235,245,255,' + (0.5 + 0.5*snowMix) + ')';
+  if (sn_mx > 0.02){
+    const snowH = 3 + 9*sn_mx;                               // 雪层厚度 3~12px
+    ctx.fillStyle = 'rgba(235,245,255,' + (0.5 + 0.5*sn_mx) + ')';
     ctx.fillRect(-120, GROUND_Y - snowH*0.3, VW+240, snowH);
   }
   // 滚动小草
@@ -2284,7 +2285,7 @@ function drawFog(){
   if (fog.opacity <= 0.01) return;
   const a = fog.opacity;
   // 雾色随天气：白天=白雾，夜晚/雷暴=蓝灰雾
-  const cool = Math.max(nightMix, stormMix, snowMix);   // 雾色随天气：白天白雾，夜晚/雷暴/雪天偏冷蓝
+  const cool = Math.max(nightMix, stormMix, sn_mx);   // 雾色随天气：白天白雾，夜晚/雷暴/雪天偏冷蓝
   const R1 = Math.round(190 + (245-190)*cool);
   const G1 = Math.round(205 + (245-205)*cool);
   const B1 = Math.round(225 + (240-225)*cool);
@@ -2459,8 +2460,8 @@ function draw(){
     ctx.fillRect(-120, -120, VW+240, VH+240);
   }
   // 雪天：背景轻微冷白罩（雪夜氛围）
-  if (snowMix > 0.02){
-    ctx.fillStyle = 'rgba(225,238,252,' + (0.10*snowMix) + ')';
+  if (sn_mx > 0.02){
+    ctx.fillStyle = 'rgba(225,238,252,' + (0.10*sn_mx) + ')';
     ctx.fillRect(-120, -120, VW+240, VH+240);
   }
   // 终点雪峰：BGM 剩余 5 秒时出现，2 秒内滑入画面中央偏右
@@ -2472,7 +2473,7 @@ function draw(){
     }
     drawSnowMountain(snowX);
   }
-  for (const f of fishes) drawFish(f.x, f.y);
+  for (const f of f_sh) drawFish(f.x, f.y);
   for (const o of ob_lst){
     if (o.type==='chili') drawChili(o.x, o.y, o.h);
     else if (o.type==='rock') drawRock(o.x, o.y, o.w, o.h);
@@ -2481,7 +2482,7 @@ function draw(){
     else drawHeli(o.x, o.y, t, o.w, o.h);
   }
   // 碎片
-  for (const s of shards){
+  for (const s of sh_d){
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.rotate(s.rot);
@@ -2495,7 +2496,7 @@ function draw(){
   if (in_v > 0 && state === 'playing' && Math.floor(performance.now()/60)%2===0) ctx.globalAlpha = 0.35;
   drawDino();
   ctx.globalAlpha = 1;
-  if (thornLevel > 0 && state === 'playing') drawThornOnDino();   // 荆棘缠身视觉
+  if (th_lv > 0 && state === 'playing') drawThornOnDino();   // 荆棘缠身视觉
   drawRain(t);          // 雨滴在前景（淋在奶龙身上）
   drawSnow();           // 雪花在前景（飘雪）
   drawFog();
@@ -2559,7 +2560,7 @@ function loop(now){
   let dt = (now - last)/1000; last = now;
   if (dt > 0.1) dt = 0.1;
   acc += dt;
-  while (acc >= 1/60){ update(1/60); acc -= 1/60; }
+  while (acc >= 1/60){ _cu(1/60); acc -= 1/60; }
   draw();
 }
 requestAnimationFrame(loop);
