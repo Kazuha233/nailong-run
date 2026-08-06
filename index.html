@@ -502,7 +502,7 @@ const clouds = [ {x:150,y:60,s:.8}, {x:430,y:95,s:1.15}, {x:660,y:48,s:.65} ];
 function pressJump(){
   initAudio();
   if (state === 'loading' || state === 'paused') return;   // 资源未就绪 / 暂停中，忽略点击
-  if (state === 'ready')   { if (document.getElementById('authMenu').style.display === 'flex') return; reset(); startGame(); return; }
+  if (state === 'ready')   { return; }                      // 开始界面/主菜单：点画布不启动（只走主菜单模式按钮）
   if (dino.mode === 'duck'){ dino.mode='run'; }    // 蹲着按跳：先站起再跳
   if (thornLevel > 0) return;                       // 荆棘缠身：无法跳跃
   if (dino.onGround){
