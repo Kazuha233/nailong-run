@@ -11,7 +11,7 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; overflow:hidden; background:#101018; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
   body { display:flex; align-items:center; justify-content:center; }
-  #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  #stage { position:fixed; inset:0; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; }  /* inset 兜底：旧 iOS(<14.5) 不识别 inset，显式四边补齐 */
   /* 竖屏（微信内置浏览器视口固定竖屏）→ 游戏旋转 90° 横板全屏显示（中心对齐视口） */
   body.portrait #stage {
     width:100vh; height:100vw;
@@ -91,8 +91,8 @@
   #mmNormal { background:#4CAF50; }
   #mmExtreme { background:#E8590C; }
   .lb-title { color:#FFB020; font-size:0.71em; font-weight:bold; text-align:center; margin-bottom:0.4em; }
-  #lbList { flex:1; overflow-y:auto; overflow-x:hidden; color:#ddd; font-size:0.57em; line-height:1.9; padding-bottom:3.75em; -webkit-overflow-scrolling:touch; }  /* 底部小留白；遮挡由成就按钮不透明底色兜底 */
-  #lbList::-webkit-scrollbar { width:0.625em; }
+  #lbList { flex:1; overflow-y:auto; overflow-x:hidden; color:#ddd; font-size:0.57em; line-height:1.9; padding-bottom:3.75em; padding-right:0.5em; -webkit-overflow-scrolling:touch; }  /* 右侧留白：滚动条相对内容更靠右 */
+  #lbList::-webkit-scrollbar { width:1em; }
   #lbList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:0.375em; }
   #lbList::-webkit-scrollbar-track { background:transparent; }
   /* 排行榜行（昵称 / 时间 / 分数 三列 + 排名；em 相对 lbList 字号 0.57×base） */
@@ -145,10 +145,10 @@
   #acTitle { color:#FFB020; font-size:0.875em; font-weight:bold; margin-top:-0.286em; }  /* 缩小并上移 */
   #acList {
     flex:1; width:100%; overflow-y:auto; overflow-x:hidden;
-    display:flex; flex-direction:column; gap:0.375em; padding-right:0.375em;
+    display:flex; flex-direction:column; gap:0.375em; padding-right:0.6em;
     -webkit-overflow-scrolling:touch;   /* 滚动平滑；触摸用 pointer 手动拖拽（enableDragScroll） */
   }
-  #acList::-webkit-scrollbar { width:0.3125em; }
+  #acList::-webkit-scrollbar { width:0.5em; }
   #acList::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25); border-radius:0.1875em; }
   #acList::-webkit-scrollbar-track { background:transparent; }
   .ac-item {
@@ -1243,12 +1243,19 @@ function spawnShards(o){
 // ---------- 资源预加载（全部就绪才进入 ready 封面，防止开场卡顿） ----------
 const HELI_FRAMES = 158, HELI_FPS = 11.11;   // 原 GIF 90ms/帧 ≈ 11.1fps
 const TOTAL_RES = 4;                    // 直升机雪碧图 + BGM + 直升机音效 + 复活音效
-let loadedRes = 0, preloadDone = false;
+let loadedRes = 0, preloadDone = false, preloadTimer = null;
 function markLoaded(){ loadedRes++; }
-function checkPreload(){
-  if (preloadDone || loadedRes < TOTAL_RES) return;
+function finishPreload(){
+  if (preloadDone) return;
   preloadDone = true;
   setTimeout(function(){ if (state === 'loading'){ state = 'ready'; showStartUI(); } }, 300);
+}
+function checkPreload(){
+  if (preloadDone) return;
+  if (loadedRes >= TOTAL_RES){ finishPreload(); return; }
+  // 超时兜底：iOS Safari/WKWebView 在用户手势前不加载音频（canplay/error 都不触发，仅图片会成功）
+  // → 无超时会卡在 1/4=25% 永远进不去；6 秒后强制进入 ready，音频后台继续（手势后 initAudio 可正常加载）
+  if (!preloadTimer) preloadTimer = setTimeout(finishPreload, 6000);
 }
 
 // ---------- 直升机吊挂动画（雪碧图：158 帧合并为 1 张图 1 个请求，11fps 裁剪播放） ----------
