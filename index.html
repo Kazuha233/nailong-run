@@ -376,9 +376,10 @@ const ctx = canvas.getContext('2d');
 // ---------- 游戏状态 ----------
 let state = 'loading';               // loading | ready | playing | gameover
 let mode = 'normal';                 // normal 普通模式 | extreme 极限模式
-let score = 0, fishCount = 10, best = 0;    // 显示分=进度×9999（匀速）；初始 10 条奶鱼
-let distScore = 0;                          // 内部距离分（只驱动速度，不显示）
-let speed = 6, groundOffset = 0, night = false;
+let s_core = 0, f_cnt = 10, best = 0;    // 显示分=进度×9999（匀速）；初始 10 条奶鱼
+let _st_t = 0;                           // 本局开始时间戳（服务端分数合理性校验用，混淆名防篡改）
+let d_sco = 0;                          // 内部距离分（只驱动速度，不显示）
+let spd = 6, groundOffset = 0, night = false;
 let nightMix = 0;                      // 昼夜过渡值（0=白天，1=夜晚，平滑渐变）
 let hudLightMix = 0;                   // HUD 文字亮色过渡（0=深灰，1=白；非雾天黑天时渐变白）
 let stormMix = 0;                      // 雷暴强度（BGM 过半后事件式来临）
@@ -412,17 +413,17 @@ for (let i=0;i<60;i++){
 let spawnDist = 500;
 
 // ---------- 奶龙 ----------
-const dino = {
+const dno = {
   x: VW/4, y: GROUND_Y, vy: 0,        // 奶龙位于屏幕四分之一处
   mode: 'run',          // run | jump | duck
   onGround: true, animT: 0
 };
 
-let obstacles = [], fishes = [];
+let ob_lst = [], fishes = [];
 
 // 破碎碎片 + 保命无敌 + 护体提示
 let shards = [];
-let invincible = 0;
+let in_v = 0;
 let shieldHint = 0;
 let zoom = 1;            // 镜头缩放（临近终点时逐渐拉远）
 let winStart = 0;        // 通关时刻（字幕动画计时）
@@ -503,13 +504,13 @@ function pressJump(){
   initAudio();
   if (state === 'loading' || state === 'paused') return;   // 资源未就绪 / 暂停中，忽略点击
   if (state === 'ready')   { return; }                      // 开始界面/主菜单：点画布不启动（只走主菜单模式按钮）
-  if (dino.mode === 'duck'){ dino.mode='run'; }    // 蹲着按跳：先站起再跳
+  if (dno.mode === 'duck'){ dno.mode='run'; }    // 蹲着按跳：先站起再跳
   if (thornLevel > 0) return;                       // 荆棘缠身：无法跳跃
-  if (dino.onGround){
+  if (dno.onGround){
     if (snowMix > 0.3){                       // 雪天地滑：起跳延迟一小会
       jumpQueued = true; jumpDelay = 0.1;
     } else {
-      dino.vy = -10; dino.mode='jump'; dino.onGround=false; sfx.jump();
+      dno.vy = -10; dno.mode='jump'; dno.onGround=false; sfx.jump();
     }
   }
 }
@@ -524,10 +525,10 @@ function pressDuck(){
       sfx.fish();
     }
   }
-  if (dino.onGround) dino.mode = 'duck';     // 按住 = 蹲下
+  if (dno.onGround) dno.mode = 'duck';     // 按住 = 蹲下
 }
 function releaseDuck(){
-  if (dino.mode === 'duck') dino.mode = 'run'; // 松手 = 站起
+  if (dno.mode === 'duck') dno.mode = 'run'; // 松手 = 站起
 }
 window.addEventListener('keydown', e => {
   if (e.repeat) return;
@@ -572,6 +573,7 @@ btnRestart.addEventListener('pointerdown', e => {
 // ---------- 开始游戏（统一入口） ----------
 function startGame(){
   state = 'playing'; sfx.start();
+  _st_t = Date.now();                      // 本局开始计时（分数校验依据：外挂瞬间通关 elapsed≈0）
   bgm.currentTime = 0; tryPlayBgm(true);   // 手势内播放；未就绪自动补播
   btnSettings.style.display = 'flex';
   document.getElementById('mainMenu').style.display = 'none';
@@ -984,13 +986,13 @@ function renderBoard(){
 // 一人一条记录：服务端函数只更新更高分（同分/低分不覆盖）
 let scoreSubmitted = false;
 async function submitScore(){
-  if (scoreSubmitted || !loggedUser || Math.floor(score) <= 0) return;
+  if (scoreSubmitted || !loggedUser || Math.floor(s_core) <= 0) return;
   if (mode !== 'extreme') return;              // 极限排行榜专属
   scoreSubmitted = true;
   try {
     const res = await supabaseFetch('rpc/upsert_leaderboard', {
       method: 'POST',
-      body: JSON.stringify({ p_nickname: loggedUser.nick, p_score: Math.floor(score) })
+      body: JSON.stringify({ p_nickname: loggedUser.nick, p_score: Math.floor(s_core), p_elapsed: Math.round((Date.now() - _st_t) / 1000) })
     });
     if (res.ok){
       if (hasLocalEquip()) syncEquip(loadEquip());   // 本地操作过佩戴才补同步（防清空服务器装备）
@@ -1198,14 +1200,14 @@ resize();
 
 // ---------- 重置 ----------
 function reset(){
-  obstacles = []; fishes = []; shards = [];
+  ob_lst = []; fishes = []; shards = [];
   scoreSubmitted = false;                  // 新一局可重新提交成绩
   heliBreakCount = 0;                      // 单局护体撞碎直升机计数清零
   crocHitCount = 0;                        // 单局撞击鳄鱼计数清零
   snowFishUsed = false;                    // 雪地行者：雪天奶鱼消耗标记清零
-  score = 0; fishCount = (mode === 'extreme' ? 0 : 10); distScore = 0; speed = 6; spawnDist = 500; night = false; nightMix = 0; hudLightMix = 0;   // 普通 10 鱼 / 极限 0 鱼
-  dino.y = GROUND_Y; dino.vy = 0; dino.mode='run'; dino.onGround=true;
-  invincible = 0; shieldHint = 0; zoom = 1;
+  s_core = 0; f_cnt = (mode === 'extreme' ? 0 : 10); d_sco = 0; spd = 6; spawnDist = 500; night = false; nightMix = 0; hudLightMix = 0;   // 普通 10 鱼 / 极限 0 鱼
+  dno.y = GROUND_Y; dno.vy = 0; dno.mode='run'; dno.onGround=true;
+  in_v = 0; shieldHint = 0; zoom = 1;
   stormMix = 0; stormFlash = 0; stormTimer = 6;
   stormActive = false; stormNext = 12; stormDur = 0;
   snowMix = 0; snowActive = false; snowNext = 22; snowDur = 0; snowHint = 0;
@@ -1318,10 +1320,10 @@ bgm.addEventListener('error', function(){
 });
 bgm.addEventListener('ended', function(){
   // BGM 放完 = 到达雪峰 = 通关。
-  // ⚠️ 防御：音频环境异常导致 BGM 提前 ended 时会误判通关（score 被硬设为 9999 上榜）——
-  // 只有分数接近终点（进度 ≥99%，score ≥ 9900）才判定通关，提前中断只算音频故障、不假通关。
+  // ⚠️ 防御：音频环境异常导致 BGM 提前 ended 时会误判通关（s_core 被硬设为 9999 上榜）——
+  // 只有分数接近终点（进度 ≥99%，s_core ≥ 9900）才判定通关，提前中断只算音频故障、不假通关。
   if (state === 'playing'){
-    if (Math.floor(score) >= 9900) winGame();
+    if (Math.floor(s_core) >= 9900) w_gm();
     else bgmBroken = true;                     // 音频故障 → 进度降级为距离估算，跑够距离仍可通关
   }
 });
@@ -1347,7 +1349,7 @@ function spawnObstacle(){
     let tx = VW + 40;
     for (let t=0;t<nThorn;t++){
       const tw = 28 + Math.random()*24;               // 宽 28~52 随机
-      obstacles.push({ type:'bramble', x: tx, w: tw, h: tw*0.85, y: GROUND_Y });
+      ob_lst.push({ type:'bramble', x: tx, w: tw, h: tw*0.85, y: GROUND_Y });
       tx += 14 + Math.random()*26;                    // 株距 14~40
     }
     spawnDist = 0;                                     // 无视间距：下一障碍紧贴荆棘丛生成（可与石块贴一起）
@@ -1361,7 +1363,7 @@ function spawnObstacle(){
   } else {                                         // 武装直升机（吊着 GIF 货物，低概率）
     o = { type:'heli', x:VW+60, w:HELI_W, h:HELI_H, y:GROUND_Y-50 };
   }
-  obstacles.push(o);
+  ob_lst.push(o);
 }
 
 // ---------- 主更新 ----------
@@ -1369,7 +1371,7 @@ function update(dt){
   if (state !== 'playing') return;
   const k = dt*60;                                  // 归一化到 60fps 基准
   // 雪天机制：空中时场景减速（落地恢复）；荆棘缠身每层减速（1层0.82/2层0.64/3层0.46）
-  const snowAirSlow = (snowMix > 0.3 && !dino.onGround) ? 0.72 : 1;
+  const snowAirSlow = (snowMix > 0.3 && !dno.onGround) ? 0.72 : 1;
   const thornSlow = thornLevel > 0 ? (1 - 0.18*thornLevel) : 1;
   const sceneK = k * snowAirSlow * thornSlow;
   // 雪天地滑：起跳延迟（到点且仍在地面则起跳）
@@ -1377,23 +1379,23 @@ function update(dt){
     jumpDelay -= dt;
     if (jumpDelay <= 0){
       jumpQueued = false;
-      if (dino.onGround && state === 'playing' && thornLevel <= 0){
-        dino.vy = -10; dino.mode='jump'; dino.onGround=false; sfx.jump();
+      if (dno.onGround && state === 'playing' && thornLevel <= 0){
+        dno.vy = -10; dno.mode='jump'; dno.onGround=false; sfx.jump();
       }
     }
   }
-  dino.animT += dt;
+  dno.animT += dt;
 
   // 速度随距离分递增（每280分+1，上限14.5；与显示分独立，保证难度曲线不变）
-  speed = Math.min(6 + distScore/280, 14.5);
-  distScore += speed * 0.02 * sceneK;
+  spd = Math.min(6 + d_sco/280, 14.5);
+  d_sco += spd * 0.02 * sceneK;
   // 显示分 = BGM 进度 × 9999（匀速增长，终点正好 9999）
   const progress = (isFinite(bgm.duration) && bgm.duration > 0 && !bgmBroken)
     ? Math.min(1, bgm.currentTime/bgm.duration)
-    : Math.min(1, distScore/DIST_TOTAL);       // 音频故障：按距离估算进度（不依赖 BGM）
-  score = Math.floor(progress * 9999);
-  if (progress >= 1 && state === 'playing') winGame();   // 距离跑满 100% 兜底通关（BGM 故障时也生效）
-  night = (Math.floor(distScore/400) % 2) === 1;        // 日夜切换（按距离分，保持原节奏）
+    : Math.min(1, d_sco/DIST_TOTAL);       // 音频故障：按距离估算进度（不依赖 BGM）
+  s_core = Math.floor(progress * 9999);
+  if (progress >= 1 && state === 'playing') w_gm();   // 距离跑满 100% 兜底通关（BGM 故障时也生效）
+  night = (Math.floor(d_sco/400) % 2) === 1;        // 日夜切换（按距离分，保持原节奏）
   nightMix += ((night ? 1 : 0) - nightMix) * Math.min(1, dt*1.6);   // 平滑渐变过渡
   // HUD 文字亮度：非雾天的黑天 → 渐变白字，雾天/白天渐变回深灰（雾里白字看不清）
   const hudTarget = (night && fog.opacity < 0.15) ? 1 : 0;
@@ -1431,7 +1433,7 @@ function update(dt){
     }
   }
   stormFlash = Math.max(0, stormFlash - dt*1.5);   // 白闪衰减放慢（约 0.6 秒，更有存在感）
-  groundOffset = (groundOffset + speed*sceneK) % 24;
+  groundOffset = (groundOffset + spd*sceneK) % 24;
 
   // ==== 雾天事件（前一半仅夜晚起雾；后一半随时；接近终点不再起雾） ====
   // halfReached / ending 已在雷暴逻辑中声明，此处复用
@@ -1504,16 +1506,16 @@ function update(dt){
   }
 
   // 奶龙物理
-  if (!dino.onGround){
-    dino.vy += 0.55 * k;
-    dino.y  += dino.vy * k;
-    if (dino.y >= GROUND_Y){ dino.y = GROUND_Y; dino.vy = 0; dino.onGround = true; if (dino.mode==='jump') dino.mode='run'; }
+  if (!dno.onGround){
+    dno.vy += 0.55 * k;
+    dno.y  += dno.vy * k;
+    if (dno.y >= GROUND_Y){ dno.y = GROUND_Y; dno.vy = 0; dno.onGround = true; if (dno.mode==='jump') dno.mode='run'; }
   }
   // 蹲下由长按控制（pressDuck/releaseDuck），无自动站起
 
   // 障碍 / 奶鱼移动
-  for (const o of obstacles){
-    o.x -= speed*sceneK;
+  for (const o of ob_lst){
+    o.x -= spd*sceneK;
     if (o.type === 'croc') o.x -= (o.vx||0)*sceneK;   // 鳄鱼额外爬行速度（比石头快）
     // 直升机进场瞬间播放出场音效（每架只响一次，实例池支持重叠）
     if (o.type === 'heli' && !o.sfxPlayed && o.x <= VW + 60){
@@ -1521,13 +1523,13 @@ function update(dt){
       playHeliSfx();
     }
   }
-  obstacles = obstacles.filter(o => o.x > -60);
-  for (const f of fishes) f.x -= speed*sceneK;
+  ob_lst = ob_lst.filter(o => o.x > -60);
+  for (const f of fishes) f.x -= spd*sceneK;
   fishes = fishes.filter(f => f.x > -40);
 
   // 生成节奏（接近终点 ending 时停止生成障碍/奶鱼，专心冲刺）
   if (!ending){
-    spawnDist -= speed*sceneK;
+    spawnDist -= spd*sceneK;
     if (spawnDist <= 0){
       spawnObstacle();
       // 奶鱼高度随机（地面以上 68~98px，跳跃可及），出现频率 8.3%（25%÷3，保命道具更稀有）
@@ -1543,16 +1545,16 @@ function update(dt){
   }
 
   // 无敌倒计时 / 护体提示
-  if (invincible > 0) invincible -= dt;
+  if (in_v > 0) in_v -= dt;
   if (shieldHint > 0) shieldHint -= dt;
 
   // 碰撞（AABB，内缩容错 4~6px 保证手感）
-  const dbox = dino.mode==='duck'
-    ? { x1:dino.x-26, y1:dino.y-47, x2:dino.x+26, y2:dino.y }
-    : { x1:dino.x-22, y1:dino.y-65, x2:dino.x+22, y2:dino.y };
-  if (invincible <= 0){
-    for (let i=obstacles.length-1;i>=0;i--){
-      const o = obstacles[i];
+  const dbox = dno.mode==='duck'
+    ? { x1:dno.x-26, y1:dno.y-47, x2:dno.x+26, y2:dno.y }
+    : { x1:dno.x-22, y1:dno.y-65, x2:dno.x+22, y2:dno.y };
+  if (in_v <= 0){
+    for (let i=ob_lst.length-1;i>=0;i--){
+      const o = ob_lst[i];
       const ob = { x1:o.x-o.w/2+5, y1:o.y-o.h+3, x2:o.x+o.w/2-5, y2:o.y-2 };
       if (dbox.x1<ob.x2 && dbox.x2>ob.x1 && dbox.y1<ob.y2 && dbox.y2>ob.y1){
         if (o.type === 'croc'){           // 撞击鳄鱼计数（🐊 鳄啊~成就，一局 3 次）
@@ -1564,25 +1566,25 @@ function update(dt){
           if (thornLevel < 3) thornLevel++;
           thornHint = 2.5;
           sfx.fish();
-          obstacles.splice(i,1);
+          ob_lst.splice(i,1);
           continue;
         }
-        if (fishCount > 0){
+        if (f_cnt > 0){
           // 保命：奶鱼 -1，障碍破碎，短暂无敌 + 复活音效
-          fishCount--;
+          f_cnt--;
           if (snowActive) snowFishUsed = true;   // 雪天中消耗奶鱼：雪地行者标记
           spawnShards(o);
           if (o.type === 'heli'){       // 护体撞碎直升机：计数，够 8 架解锁 🚁 Man！
             heliBreakCount++;
             if (heliBreakCount >= 8) unlockAchievement('heliMan', true);
           }
-          obstacles.splice(i,1);
-          invincible = 1.5;
+          ob_lst.splice(i,1);
+          in_v = 1.5;
           shieldHint = 1.2;
           reviveSfx.currentTime = 0;
           reviveSfx.play().catch(function(){});
         } else {
-          gameOver(); return;
+          g_ov(); return;
         }
       }
     }
@@ -1590,18 +1592,18 @@ function update(dt){
   for (let i=fishes.length-1;i>=0;i--){
     const f = fishes[i];
     if (dbox.x1<f.x+9 && dbox.x2>f.x-9 && dbox.y1<f.y+6.5 && dbox.y2>f.y-6.5){
-      fishes.splice(i,1); fishCount++; sfx.fish();   // 奶鱼：保命+计数（不再加分，保证终点正好9999）
+      fishes.splice(i,1); f_cnt++; sfx.fish();   // 奶鱼：保命+计数（不再加分，保证终点正好9999）
     }
   }
   // 碎片物理（重力 + 摩擦 + 旋转）
   // 荆棘行者累积：缠身期间连续前进 2500 分（荆棘解除则重新计数）
   if (thornLevel > 0){
-    thornScore += score - thornScoreBase;
-    thornScoreBase = score;
+    thornScore += s_core - thornScoreBase;
+    thornScoreBase = s_core;
     if (thornScore >= 2500) unlockAchievement('thornWalker', true);
   } else {
     thornScore = 0;
-    thornScoreBase = score;
+    thornScoreBase = s_core;
   }
   for (let i=shards.length-1;i>=0;i--){
     const s = shards[i];
@@ -1615,34 +1617,34 @@ function update(dt){
   }
 }
 
-function gameOver(){
+function g_ov(){
   state = 'gameover'; sfx.hit();
   bgm.pause();
   btnRestart.style.display = 'block';          // 必须点击按钮才能再来一局
   btnSettings.style.display = 'none';
-  if (Math.floor(score) > best){
-    best = Math.floor(score);
+  if (Math.floor(s_core) > best){
+    best = Math.floor(s_core);
     try { localStorage.setItem('nailongRunBestV2', best); } catch(e){}
   }
   submitScore();                                // 结算自动提交成绩
 }
 
-function winGame(){
+function w_gm(){
   // 音乐放完 = 到达雪峰 = 通关！得分定格 9999（完美通关彩蛋）
-  score = 9999;
+  s_core = 9999;
   state = 'win';
   winStart = performance.now();
   zoom = 0.8;
   btnRestart.style.display = 'block';
-  if (Math.floor(score) > best){
-    best = Math.floor(score);
+  if (Math.floor(s_core) > best){
+    best = Math.floor(s_core);
     try { localStorage.setItem('nailongRunBestV2', best); } catch(e){}
   }
   submitScore();                                // 通关自动提交 9999
   // 成就记录：极限雪峰（极限模式通关）/ 年年有鱼（剩余奶鱼≥6）
   unlockAchievement('summit', best >= 9999);
   unlockAchievement('extremeWin', mode === 'extreme');
-  unlockAchievement('fish6', fishCount >= 6);
+  unlockAchievement('fish6', f_cnt >= 6);
   // 胜利三连音
   beep(523, 784, .18, 'sine', .15);
   setTimeout(function(){ beep(659, 988, .18, 'sine', .15); }, 180);
@@ -1651,19 +1653,19 @@ function winGame(){
 
 // ---------- 绘制：奶龙（直立大胖子 · 程序绘制） ----------
 function drawDino(){
-  const t = dino.animT;
+  const t = dno.animT;
   ctx.save();
   let bob = 0, sx = 1, sy = 1, lean = 0;
-  if (dino.mode === 'run'  && dino.onGround) bob = Math.sin(t*13)*3.2;
-  if (dino.mode === 'jump'){ sy = 1.05; lean = -0.06; }
-  if (dino.mode === 'duck'){ sy = 0.72; sx = 1.15; lean = 0.12; }
-  ctx.translate(dino.x, dino.y + bob);
+  if (dno.mode === 'run'  && dno.onGround) bob = Math.sin(t*13)*3.2;
+  if (dno.mode === 'jump'){ sy = 1.05; lean = -0.06; }
+  if (dno.mode === 'duck'){ sy = 0.72; sx = 1.15; lean = 0.12; }
+  ctx.translate(dno.x, dno.y + bob);
   ctx.rotate(lean);
   ctx.scale(sx*1.3, sy*1.3);   // 整体放大 1.3 倍
 
-  const step = dino.onGround && dino.mode==='run' ? Math.sin(t*13) : 0;
+  const step = dno.onGround && dno.mode==='run' ? Math.sin(t*13) : 0;
   const lift = Math.abs(step)*4;
-  const crouched = (dino.mode==='jump' || dino.mode==='duck');
+  const crouched = (dno.mode==='jump' || dno.mode==='duck');
 
   // ===== 腿（直立行走，交替迈步） =====
   ctx.fillStyle = '#FFD93D';
@@ -1686,7 +1688,7 @@ function drawDino(){
   // ===== 尾巴（屁股后面，跑动甩） =====
   ctx.save();
   ctx.translate(-16, -20);
-  ctx.rotate(Math.sin(t*13)*0.25 + (dino.mode==='jump'?0.5:0));
+  ctx.rotate(Math.sin(t*13)*0.25 + (dno.mode==='jump'?0.5:0));
   ctx.fillStyle = '#FFD93D';
   ctx.beginPath(); ctx.ellipse(-3, 0, 6.5, 4.2, -0.5, 0, Math.PI*2); ctx.fill();
   ctx.restore();
@@ -1700,7 +1702,7 @@ function drawDino(){
   ctx.beginPath(); ctx.ellipse(1.5, -17, 13, 12, 0, 0, Math.PI*2); ctx.fill();
 
   // ===== 手臂（小短手，跑步摆动） =====
-  const armSwing = dino.onGround && dino.mode==='run' ? Math.sin(t*13)*0.5 : (dino.mode==='jump' ? -0.5 : 0.35);
+  const armSwing = dno.onGround && dno.mode==='run' ? Math.sin(t*13)*0.5 : (dno.mode==='jump' ? -0.5 : 0.35);
   ctx.fillStyle = '#FFD93D';
   ctx.save(); ctx.translate(14, -22); ctx.rotate(-armSwing);
   ctx.beginPath(); ctx.ellipse(0, 2, 3.5, 5, 0, 0, Math.PI*2); ctx.fill();
@@ -1900,8 +1902,8 @@ function drawThornOnDino(){
   const L = thornLevel;
   if (L <= 0) return;
   // 跟随奶龙身体的上下浮动（bob 与 drawDino 一致）
-  const bob = (dino.mode === 'run' && dino.onGround) ? Math.sin(performance.now()/1000*13)*3.2 : 0;
-  const bx = dino.x, by = dino.y + bob;
+  const bob = (dno.mode === 'run' && dno.onGround) ? Math.sin(performance.now()/1000*13)*3.2 : 0;
+  const bx = dno.x, by = dno.y + bob;
   // 棕色枝条：层数越多缠得越满（1层4根 / 2层6根 / 3层10根，绕身体分布）
   ctx.strokeStyle = '#8B5A2B';
   ctx.lineWidth = 2;
@@ -2188,14 +2190,14 @@ function drawUI(){
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   ctx.fillStyle = hudCol(0.75, 0.9);
   ctx.font = 'bold 22px "Microsoft YaHei", monospace';
-  ctx.fillText('得分 ' + Math.floor(score), 8, 16);
+  ctx.fillText('得分 ' + Math.floor(s_core), 8, 16);
   ctx.font = 'bold 14px "Microsoft YaHei", monospace';
   ctx.fillStyle = hudCol(0.55, 0.8);
   ctx.fillText('最高 ' + best, 8, 44);
   // 奶鱼计数
   drawFish(8, 66);
   ctx.fillStyle = hudCol(0.6, 0.85);
-  ctx.fillText('× ' + fishCount, 24, 62);
+  ctx.fillText('× ' + f_cnt, 24, 62);
 }
 // ---------- 加载界面（资源就绪前显示，就绪后自动进封面） ----------
 function drawLoading(){
@@ -2205,9 +2207,9 @@ function drawLoading(){
   ctx.fillStyle = '#241f2e';
   ctx.fillRect(0, GROUND_Y, VW, VH - GROUND_Y);
   // 奶龙（跑动动画活跃加载氛围）
-  dino.animT = performance.now()/1000;
-  dino.x = VW/4; dino.y = GROUND_Y;   // 与游戏内位置一致（四分之一处）
-  dino.onGround = true; dino.mode = 'run';
+  dno.animT = performance.now()/1000;
+  dno.x = VW/4; dno.y = GROUND_Y;   // 与游戏内位置一致（四分之一处）
+  dno.onGround = true; dno.mode = 'run';
   drawDino();
   // 标题
   ctx.textAlign = 'center';
@@ -2246,8 +2248,8 @@ function drawGameOver(){
   ctx.fillText('撞到啦！(>ω<)', VW/2, 100);
   ctx.fillStyle = '#2B2B2B';
   ctx.font = 'bold 22px "Microsoft YaHei", sans-serif';
-  ctx.fillText('得分 ' + Math.floor(score) + '    最高 ' + best, VW/2, 140);
-  if (Math.floor(score) >= best && score > 0){
+  ctx.fillText('得分 ' + Math.floor(s_core) + '    最高 ' + best, VW/2, 140);
+  if (Math.floor(s_core) >= best && s_core > 0){
     ctx.fillStyle = '#F59F00';
     ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
     const blink = Math.sin(performance.now()/250) > 0 ? 1 : 0.3;
@@ -2257,7 +2259,7 @@ function drawGameOver(){
   }
   ctx.fillStyle = 'rgba(43,43,43,.7)';
   ctx.font = '15px "Microsoft YaHei", sans-serif';
-  ctx.fillText('奶鱼 × ' + fishCount + '    点击下方按钮再来一局', VW/2, 196);
+  ctx.fillText('奶鱼 × ' + f_cnt + '    点击下方按钮再来一局', VW/2, 196);
   ctx.restore();
 }
 
@@ -2407,7 +2409,7 @@ function drawWin(){
     // 结算信息
     ctx.fillStyle = 'rgba(255,255,255,.9)';
     ctx.font = 'bold 20px "Microsoft YaHei", sans-serif';
-    ctx.fillText('得分 ' + Math.floor(score) + '    奶鱼 × ' + fishCount, VW/2, VH*0.40 + 52);
+    ctx.fillText('得分 ' + Math.floor(s_core) + '    奶鱼 × ' + f_cnt, VW/2, VH*0.40 + 52);
     ctx.fillStyle = 'rgba(255,255,255,.65)';
     ctx.font = '15px "Microsoft YaHei", sans-serif';
     ctx.fillText('最高纪录 ' + best, VW/2, VH*0.40 + 80);
@@ -2455,7 +2457,7 @@ function draw(){
     drawSnowMountain(snowX);
   }
   for (const f of fishes) drawFish(f.x, f.y);
-  for (const o of obstacles){
+  for (const o of ob_lst){
     if (o.type==='chili') drawChili(o.x, o.y, o.h);
     else if (o.type==='rock') drawRock(o.x, o.y, o.w, o.h);
     else if (o.type==='croc') drawCroc(o.x, o.y, t, o.w, o.h);
@@ -2474,7 +2476,7 @@ function draw(){
   }
   ctx.globalAlpha = 1;
   // 保命无敌期间奶龙闪烁
-  if (invincible > 0 && state === 'playing' && Math.floor(performance.now()/60)%2===0) ctx.globalAlpha = 0.35;
+  if (in_v > 0 && state === 'playing' && Math.floor(performance.now()/60)%2===0) ctx.globalAlpha = 0.35;
   drawDino();
   ctx.globalAlpha = 1;
   if (thornLevel > 0 && state === 'playing') drawThornOnDino();   // 荆棘缠身视觉
