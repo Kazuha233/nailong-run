@@ -665,7 +665,15 @@ try {
 } catch(e){}
 function saveLogin(nick, hash){
   loggedUser = { nick: nick, hash: hash };
-  try { localStorage.setItem('nlUser', JSON.stringify(loggedUser)); } catch(e){}
+  try {
+    localStorage.setItem('nlUser', JSON.stringify(loggedUser));
+    // 账号切换边界：清空上一个账号的本地成就/佩戴/最高分（成就跟账号走，绝不继承）
+    localStorage.removeItem('nlAch');
+    localStorage.removeItem('nlEquip');
+    localStorage.removeItem('nlEquipSet');
+    localStorage.removeItem('nailongRunBestV2');
+  } catch(e){}
+  best = 0;
 }
 
 // Supabase REST（Publishable key 为公开 key，可放前端）
@@ -719,8 +727,16 @@ function enterMainMenu(){
 }
 // 退出登录：确认弹窗 → 清除登录态回开始界面
 function doLogout(){
-  try { localStorage.removeItem('nlUser'); } catch(e){}
+  try {
+    localStorage.removeItem('nlUser');
+    // 退出同样清空账号数据（成就/佩戴/最高分），防残留到下一个账号
+    localStorage.removeItem('nlAch');
+    localStorage.removeItem('nlEquip');
+    localStorage.removeItem('nlEquipSet');
+    localStorage.removeItem('nailongRunBestV2');
+  } catch(e){}
   loggedUser = null;
+  best = 0;
   document.getElementById('mainMenu').style.display = 'none';
   authMenu.style.display = 'flex';
 }
@@ -953,7 +969,7 @@ function fmtLbTime(iso){
 }
 async function loadBoard(){
   try {
-    const res = await supabaseFetch('leaderboard?select=nickname,score,created_at,equip&order=score.desc,created_at.asc&limit=25');
+    const res = await supabaseFetch('leaderboard?select=nickname,score,created_at,equip&order=score.desc,created_at.asc&limit=50');
     if (!res.ok) return;                       // 表未建/网络异常：保留占位「⏳ 接入中…」
     lbData = await res.json();
     if (loggedUser){                           // 以服务器佩戴状态同步本地（跨设备一致）
